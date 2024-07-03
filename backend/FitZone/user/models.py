@@ -1,4 +1,3 @@
-from typing import Any
 from django.db import models
 from django.contrib.auth.models import User 
 
@@ -11,7 +10,6 @@ class Client(models.Model):
     address = models.CharField(null = True)
         
     def delete(self, *args, **kwargs):
-        print(self.user.client)
         if self.user:
             self.user.is_deleted = True
             self.user.save()

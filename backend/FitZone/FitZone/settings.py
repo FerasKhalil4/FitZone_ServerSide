@@ -43,11 +43,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+    #external packages
     'rest_framework',
     'rest_framework_simplejwt',
-
-    
+    'drf_spectacular',
+    #internal apps
     'user',
     'gym',
 ]
@@ -144,8 +144,12 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
-}
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    }
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days = 5),
     'REFRESH_TOKEN_LIFETIME':timedelta(days = 10),
 }
+SPECTACULAR_SETTINGS = {
+    "TITLE": "FitZone"
+    }
