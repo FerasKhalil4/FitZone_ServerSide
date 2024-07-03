@@ -1,0 +1,9 @@
+django>=4.2.0,<5.1.0
+djangorestframework
+djangorestframework-simplejwt
+Pillow
+pyyaml
+psycopg2-binary
+requests
+django-cors-headers
+drf-spectacular
