@@ -111,8 +111,9 @@ class ClassesSerializer(serializers.ModelSerializer):
                  )&
             days_of_week_overlap(used_data)
             )
-            instance = self.context.get('instance').id or None
-            if instance is not None:
+            instance_ = self.context.get('instance') or None
+            if instance_ is not None:
+                instance = instance_.id
                 overlap_con &= ~Q(id=instance) 
             overlapped_classed = Classes.objects.filter(overlap_con)
             if overlapped_classed.exists():
