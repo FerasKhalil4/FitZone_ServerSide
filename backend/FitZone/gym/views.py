@@ -1,4 +1,4 @@
-import traceback
+from collections import defaultdict
 from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 from rest_framework.views import APIView 
@@ -11,32 +11,31 @@ from rest_framework.permissions import IsAuthenticated
 
 class GymListCreateAV(generics.ListCreateAPIView):
     serializer_class = GymSerializer
-    permission_classes = [IsAuthenticated,admin_permissions]
+    # permission_classes = [IsAuthenticated,admin_permissions]
     def get_queryset(self):
         return Gym.objects.filter(is_deleted = False).all()    
-    
     
     def create (self, request, *args, **kwargs):    
         gym_serializer = GymSerializer(data =request.data)        
         if gym_serializer.is_valid(raise_exception=True):
             gym_serializer.save()
-            return Response({'data':gym_serializer.data},status=201)
+            return Response({'data':gym_serializer.data},status=status.HTTP_201_CREATED)
         return Response(gym_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
 GymListCreate = GymListCreateAV.as_view()
 
-class GymRetrieveDestroyAV(generics.RetrieveDestroyAPIView):
+class GymRetrieveUpdateDestroyAV(generics.RetrieveUpdateDestroyAPIView):
     
     serializer_class = GymSerializer
-    
-    def get_queryset(self):
-        return Gym.objects.filter(is_deleted = False).all()       
+         
     def get_object(self , pk):
-        return Gym.objects.filter(pk = pk , is_deleted = False).get()         
+        return Gym.objects.get(pk = pk ,is_deleted = False)       
     
     def get(self, request, pk, *args, **kwargs):
         try:
-                gym = Gym.objects.filter(pk=pk).get()
+                gym = self.get_object(pk=pk) or None
+                if gym is None:
+                    return Response(status=status.HTTP_404_NOT_FOUND)
                 branches = Branch.objects.filter(gym=gym)
                 branches_data = {
                 'data': BranchSerializer(branches, many=True).data,
@@ -48,12 +47,30 @@ class GymRetrieveDestroyAV(generics.RetrieveDestroyAPIView):
     
     def update(self ,request, pk, *args , **kwargs):
         data = request.data 
-        gym = self.get_object(pk)
+        gym = self.get_object(pk) or None
+        if gym is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         serializer = GymSerializer(gym ,data = data , partial = True )
         serializer.is_valid(raise_exception = True)
         serializer.save()
         return Response(serializer.data)
-GymRetrieveDestroy = GymRetrieveDestroyAV.as_view()   
+    
+    def delete (self ,request, pk, *args , **kwargs):
+        gym = self.get_object(pk) or None
+        if gym is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        try:
+            gym.is_deleted = True
+            gym.save()
+            branches = Branch.objects.filter(gym=gym)
+            for branch in branches:
+                branch.is_active = False
+                branch.save()
+        except Exception as e:
+            raise serializers.ValidationError({'error': str(e)})
+        return Response(status=status.HTTP_204_NO_CONTENT)
+        
+GymRetrieveUpdateDestroy = GymRetrieveUpdateDestroyAV.as_view()   
 
 class ManagerGymListAV(generics.ListAPIView):
     serializer_class = GymSerializer
@@ -148,15 +165,43 @@ class EmployeeListAV(generics.ListCreateAPIView):
    
     def post(self, request, pk ,*args , **kwargs):
         data = request.data 
+        data['is_trainer'] = False
         data['shift']['branch'] = pk  
         employee_serializer = EmployeeSerializer(data = data)
         if employee_serializer.is_valid(raise_exception=True):
             employee_serializer.save()
-        return Response({'data': employee_serializer.data  }, status= status.HTTP_201_CREATED)
+        return Response({'data': employee_serializer.data }, status= status.HTTP_201_CREATED)
     
 employeeListAV = EmployeeListAV.as_view()
 
-
+class TrainerListAV(generics.ListCreateAPIView):
+    serializer_class = EmployeeSerializer
+    
+    def get_queryset(self, id):
+        return Employee.objects.filter(is_trainer = True , user__is_deleted= False , employee__branch_id=id)
+    
+    def get(self, request, *args, **kwargs):
+        try:
+            user = request.user 
+            employee = Employee.objects.get(user=user)
+            branch_id = Shifts.objects.filter(employee=employee).first().branch_id
+            qs = self.get_queryset(branch_id)
+            serializer = self.get_serializer(qs,many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            raise serializers.ValidationError({'error': str(e)})
+        
+    def post(self, request ,*args , **kwargs):
+        data = request.data 
+        data['is_trainer'] = True
+        employee = Employee.objects.get(user=request.user)
+        branch_id = Shifts.objects.filter(employee=employee).first().branch_id
+        data['shift']['branch'] = branch_id  
+        employee_serializer = EmployeeSerializer(data = data)
+        if employee_serializer.is_valid(raise_exception=True):
+            employee_serializer.save()
+        return Response({'data': employee_serializer.data }, status= status.HTTP_201_CREATED)
+    
+trainerListAV = TrainerListAV.as_view()
 
         
-# {	"name":"gym_32",	"description":"description_23",	"regestration_price":9.99,	"allow_retrival":false,	"start_hour":"09:00:00",	"close_hour":"00:00:00"	}

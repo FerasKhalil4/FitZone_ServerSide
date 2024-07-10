@@ -15,11 +15,8 @@ class Gym(models.Model):
     close_hour = models.TimeField()
     mid_day_hour = models.TimeField()
     manager = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manager')
+    allow_public_posts = models.BooleanField(default=True)
     
-    def delete(self , *args , **kwargs):
-        if self:
-            self.is_deleted = True
-            self.save()
     
 class Woman_Training_Hours(models.Model):
     gym = models.ForeignKey(Gym , on_delete=models.CASCADE,related_name="woman_gym" )

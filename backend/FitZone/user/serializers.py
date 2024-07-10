@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Client
+from .models import Client, History
 from datetime import date
 
 class UserSerializer(serializers.ModelSerializer):
@@ -63,12 +63,29 @@ class UserSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+    
+class HistorySerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = History
+        fields = ['weight','goal','weight_goal','required_protien','required_carbs','required_fats','required_calories']
+    
+        # def nutrions_calculate(self , data):
+    #     weight = data.get('weight')
+    #     gender = data.get('gender')
+    #     height = data.get('height')
+    #     goal = data.get('goal')
+        
+    #     if goal == 'lose':
+    #         if gender == 'female':
         
         
     
 class ClientSerializer(serializers.ModelSerializer):
     points = serializers.IntegerField(read_only=True)
     user_profile = UserSerializer(write_only=True)
+    history = HistorySerializer(write_only=True)
+    history_data = HistorySerializer(read_only=True)
     user = UserSerializer(read_only=True)
     
     class Meta:
@@ -81,10 +98,13 @@ class ClientSerializer(serializers.ModelSerializer):
             'address',
             'height',
             'points',
+            'history',
+            'history_data',
         ]
 
     def create(self, validated_data):
         user_data = validated_data.pop('user_profile', None)
+
         user_data['role'] = 5
         if user_data is not None:
             user_serializer = UserSerializer(data=user_data)

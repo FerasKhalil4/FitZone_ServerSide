@@ -21,6 +21,5 @@ urlpatterns = [
     path('verify/',TokenVerifyView.as_view(),name ='verify'),
     path('profile/client/' , client_profile , name = 'client_profile'),
     path('employee-edit/<int:pk>/',employeeDetailAV , name = 'employeeListAV'),
-    
     # path('profile/' , user_profile , name = 'user_profile'),
 ]
