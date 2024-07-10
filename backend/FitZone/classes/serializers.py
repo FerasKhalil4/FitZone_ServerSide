@@ -80,37 +80,35 @@ class ClassesSerializer(serializers.ModelSerializer):
                 hall = data['hall'],
                 start_date__lte = data['start_date'],
                 end_date__gt = data['start_date'],
-                trainer = data['trainer_id'],
-            )&(Q(start_time__lte = data['start_time'], end_time__gt = data['start_time'])
-                | Q(start_time__lt = data['end_time'], end_time__gte = data['end_time'])
-                | Q(start_time__gte = data['start_time'], end_time__lte = data['end_time'])
-            )&
-                days_of_week_overlap(used_data) 
+            )
             )|(
                 Q(
                 start_date__lt = data['end_date'],
                 end_date__gte = data['end_date'],
                  hall=data['hall'],
                 trainer = data['trainer_id'],
-            )&(
-                Q(start_time__lte = data['start_time'], end_time__gt = data['start_time'])
-                | Q(start_time__lt = data['end_time'], end_time__gte = data['end_time'])
-                | Q(start_time__gte = data['start_time'], end_time__lte = data['end_time'])
-            )&
-                days_of_week_overlap(used_data) 
-           
+            )
             )|(
                 Q(
                 hall = data['hall'],
                 start_date__gte = data['start_date'],
                 end_date__lte = data['end_date'],
                 trainer = data['trainer_id'],
-            )&( Q(start_time__lte = data['start_time'], end_time__gt = data['start_time'])
+            )
+            )
+            
+            overlap_con &= (Q(start_time__lte = data['start_time'], end_time__gt = data['start_time'])
                  | Q(start_time__lt = data['end_time'], end_time__gte = data['end_time'])
                  | Q(start_time__gte = data['start_time'], end_time__lte = data['end_time'])
-                 )&
-            days_of_week_overlap(used_data)
-            )
+                 )
+            overlap_con &= days_of_week_overlap(used_data)
+            overlap_con &= (Q(
+                    trainer = data['trainer_id']
+                ) | ~Q (
+                    trainer = data['trainer_id']
+                )
+              )
+            
             instance_ = self.context.get('instance') or None
             if instance_ is not None:
                 instance = instance_.id
