@@ -16,6 +16,7 @@ class Gym(models.Model):
     mid_day_hour = models.TimeField()
     manager = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manager')
     allow_public_posts = models.BooleanField(default=True)
+    allow_public_products = models.BooleanField(default=True)
     
     
 class Woman_Training_Hours(models.Model):

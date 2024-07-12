@@ -56,7 +56,7 @@ class GymSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Gym
-        fields =['id','allow_public_posts','name' , 'description','regestration_price','image_path',
+        fields =['id','allow_public_posts','allow_public_posts','name' , 'description','regestration_price','image_path',
                  'created_at','start_hour','close_hour' ,'mid_day_hour','manager',
                  'manager_id','manager_details','branch','woman_gym','woman_hours',
                  'allow_retrival', 'duration_allowed', 'cut_percentage']   
@@ -113,11 +113,15 @@ class GymSerializer(serializers.ModelSerializer):
 class ShiftSerializer(serializers.ModelSerializer):
     branch = serializers.PrimaryKeyRelatedField(queryset=Branch.objects.filter(is_active=True), write_only=True, required=True)
     branch_details = BranchSerializer(source='branch', read_only=True)
-    employee = serializers.PrimaryKeyRelatedField(read_only=True) 
-    # shift_time = serializers.CharField(source = 'shift_type' , read_only=True)
     class Meta:
         model = Shifts
         fields = [ 'shift_type','employee' , 'id', 'branch', 'branch_details', 'is_active', 'days_off']
+    
+    def validate(self, data):
+        check_overlap_shift = Shifts.objects.filter(employee = data.get('employee'), shift_type = data.get('shift_type'))
+        if check_overlap_shift.exists():
+            raise serializers.ValidationError('there is an overlap, check on the employee shift scheduel')
+        return data
     
     def validate_days_off(self,data):
         days = list(data.values())
@@ -130,13 +134,9 @@ class ShiftSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        employee = validated_data.pop('employee')
-        shift = Shifts.objects.create(**validated_data, employee=employee)
-        return shift
-
-        
-        
-        
+        employee_id = validated_data.pop('employee')
+        shift = Shifts.objects.create(**validated_data, employee=employee_id)
+        return shift        
 class EmployeeSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(required=False)
     shifts = ShiftSerializer(source = 'employee' ,read_only = True , many = True)

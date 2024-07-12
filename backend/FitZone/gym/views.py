@@ -205,3 +205,20 @@ class TrainerListAV(generics.ListCreateAPIView):
 trainerListAV = TrainerListAV.as_view()
 
         
+class ShiftsCreateAV(generics.CreateAPIView):
+    serializer_class = ShiftSerializer
+    queryset = Shifts.objects.filter(is_active=True)
+    
+    def post(self, request, pk, *args, **kwargs):
+        data = request.data
+        try:
+            data['employee'] = pk
+            print(data)
+            serializer = self.get_serializer(data=data)
+            if serializer.is_valid(raise_exception=True):
+                serializer.save()
+                return Response({'message':f"shift created Completly",'data' : serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            raise serializers.ValidationError(str(e))
+shiftCreateAV = ShiftsCreateAV.as_view()
+        
