@@ -15,17 +15,13 @@ class Client(models.Model):
             self.user.save()
         # super(Client, self).delete(*args, **kwargs) delete the record
 
-class History (models.Model):
-    client = models.ForeignKey(Client , on_delete=models.CASCADE , related_name= "client")
+class Goal (models.Model):
+    client = models.ForeignKey(Client , on_delete=models.CASCADE , related_name= "history")
     weight =models.FloatField(default=0.0)
-    goal = models.CharField( max_length=50)
+    goal = models.CharField(max_length=50)
     goal_weight = models.FloatField(default=0.0)
-    required_protien = models.FloatField(default=0.0)
-    required_carbs = models.FloatField(default=0.0)
-    required_fats = models.FloatField(default=0.0)
-    required_calories = models.FloatField(default=0.0)
-    
-    
+    predicted_date = models.DateField(blank=True)
+    created_at = models.DateField(auto_now_add=True)
     
 
     

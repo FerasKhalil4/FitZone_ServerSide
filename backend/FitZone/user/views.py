@@ -7,11 +7,10 @@ from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
-from .serializers import UserSerializer, ClientSerializer
-from .models import Client , History
+from .serializers import *
 from .permissions import ClientCheck
 from gym.models import Employee , Shifts , Branch
-from gym.seriailizers import EmployeeSerializer , BranchSerializer ,ShiftSerializer 
+from gym.seriailizers import EmployeeSerializer  ,ShiftSerializer 
 
 class RegistrationAV(APIView):
     def post(self, request, *args, **kwargs):
@@ -20,18 +19,18 @@ class RegistrationAV(APIView):
         
         if serializer.is_valid():
             account = serializer.save()
-            
             user_profile = serializer.validated_data['user_profile']
             user_profile.pop('password', None)
             data['user'] = user_profile
-            if user_profile['role'] == 3 or user_profile['role'] == 4:
-                employee = Employee.objects.get(user_id=user_profile['id'])
-                branch_id = Shifts.objects.get(employee=employee, is_active= True).branch_id
-                gym_id = Branch.objects.get(id=branch_id).gym_id
-                data['branch_id'] = branch_id
-                data['gym_id'] = gym_id
+            
+            # if user_profile['role'] == 3 or user_profile['role'] == 4:
+            #     employee = Employee.objects.get(user_id=user_profile['id'])
+            #     branch_id = Shifts.objects.get(employee=employee, is_active= True).branch_id
+            #     gym_id = Branch.objects.get(id=branch_id).gym_id
+            #     data['branch_id'] = branch_id
+            #     data['gym_id'] = gym_id
                 #do the same for client
-            refresh = RefreshToken.for_user(account)
+            refresh = RefreshToken.for_user(account['user'])
             data['token'] = {
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
@@ -49,27 +48,27 @@ class LoginAV(APIView):
     
     def post(self , request, *args, **kwargs):
         data={}
-        print(request.data)
         account = User.objects.filter(username = request.data.get('username') , is_deleted = False) .first()   
         
         if account :
             if account.check_password(request.data.get('password')):
                 if account.role == 3 or account.role == 4:
-                    print(account.id)
                     try:
                         employee = Employee.objects.get(user_id=account.id)
                         branch_id = Shifts.objects.get(employee=employee, is_active= True).branch_id
                         gym_id = Branch.objects.get(id=branch_id).gym_id  
+                        data['branch_id'] = branch_id
+                        data['gym_id'] = gym_id
                     except Exception as e:
                         raise serializers.ValidationError({'error':str(e)})
                 refresh = RefreshToken.for_user(account)
+                
                 data['token'] = {'refresh_token':str(refresh) ,
-                                'access':str(refresh.access_token)} ,
-                 
-                data['username'] = account.username
+                                'access':str(refresh.access_token)} 
+                
+                data['username'] = account.username  
                 data['role'] = account.role
-                data['branch_id'] = branch_id
-                data['gym_id'] = gym_id
+
                 return Response(data, status = status.HTTP_200_OK)
             else:
                 return Response({'error':'wrong password'}, status = status.HTTP_403_FORBIDDEN)
@@ -78,12 +77,17 @@ class LoginAV(APIView):
             
 Login = LoginAV.as_view()
 
+
+class ClientListAV(generics.ListAPIView):
+    serializer_class = ClientSerializer
+    queryset = Client.objects.filter(user__is_deleted = False)
+    
+clientListAv = ClientListAV.as_view()
 class ClientProfile(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ClientSerializer
-    permission_classes = [ClientCheck]
-
-    def get_object(self):
-            return self.request.user.client
+    queryset = Client.objects.filter(user__is_deleted = False)
+    # permission_classes = [ClientCheck]
+    
     
     def update(self, request, *args, **kwargs):
         client = self.get_object()
@@ -102,9 +106,7 @@ class ClientProfile(generics.RetrieveUpdateDestroyAPIView):
         return Response( client_serializer.data)
 client_profile = ClientProfile.as_view()
 
-# class HistoryListAV(generics.ListCreateAPIView):
-#     queryset = History.objects.all()
-#     serializer_class = HistorySerializer
+
 
 class EmployeeDetailAV(generics.RetrieveAPIView):
     
@@ -170,4 +172,22 @@ class EmployeeDetailAV(generics.RetrieveAPIView):
         
 employeeDetailAV = EmployeeDetailAV.as_view()
 
+class GoalListAV(generics.CreateAPIView):
+    serializer_class = GoalSerializer
+    queryset = Goal.objects.all()
+    def post(self, request, pk, *args, **kwargs):
+        data = request.data
+        try:
+            client = Client.objects.get(user = request.user.id)
+            data['client']=client.id
+            
+            serializer = GoalSerializer(data = data, context = {'request': request,'client': client})
+            data['current_BMI'] = data['weight'] / pow(client.height, 2)
+            if serializer.is_valid(raise_exception=True):                
+                serializer.save()
+                return Response(serializer.data, status= status.HTTP_201_CREATED)
+        except Exception as e:
+            raise serializers.ValidationError(str(e))
+            
+GoalListAv = GoalListAV.as_view()
 

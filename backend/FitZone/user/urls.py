@@ -19,7 +19,9 @@ urlpatterns = [
     path('TokenObtainPairView/',TokenObtainPairView.as_view(),name = 'TokenObtainPairView'),
     path('refresh/',TokenRefreshView.as_view(),name ='refresh'),
     path('verify/',TokenVerifyView.as_view(),name ='verify'),
-    path('profile/client/' , client_profile , name = 'client_profile'),
+    path('profile/client/<int:pk>', client_profile , name = 'client_profile'),
+    path('clients/',clientListAv,name = 'clients'),
     path('employee-edit/<int:pk>/',employeeDetailAV , name = 'employeeListAV'),
+    path('client/goal/',GoalListAv,name = 'goalListAV'),
     # path('profile/' , user_profile , name = 'user_profile'),
 ]

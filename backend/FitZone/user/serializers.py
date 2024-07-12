@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Client, History
+from .models import Client, Goal
 from datetime import date
 
 class UserSerializer(serializers.ModelSerializer):
@@ -63,30 +63,30 @@ class UserSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
-    
-class HistorySerializer(serializers.ModelSerializer):
-    
+            
+        
+class GoalSerializer(serializers.ModelSerializer):
+    client = serializers.IntegerField(write_only=True)
+    predicted_date = serializers.DateField(required=True,input_formats=["%Y-%m-%d"])
     class Meta:
-        model = History
-        fields = ['weight','goal','weight_goal','required_protien','required_carbs','required_fats','required_calories']
+        model = Goal
+        fields = ['client','weight','goal','goal_weight','predicted_date']
+        ordering = ['created_at']
     
-        # def nutrions_calculate(self , data):
-    #     weight = data.get('weight')
-    #     gender = data.get('gender')
-    #     height = data.get('height')
-    #     goal = data.get('goal')
+    def validate(self, data):
+        today = date.today()
+        client = self.context.get('client')
+        check = Goal.objects.filter(predicted_date__gt = today , client=client)
+        if check.exists():
+            raise serializers.ValidationError("A future prediction already exists. Please resolve it before creating a new one.")
+        return data
         
-    #     if goal == 'lose':
-    #         if gender == 'female':
-        
-        
-    
 class ClientSerializer(serializers.ModelSerializer):
     points = serializers.IntegerField(read_only=True)
     user_profile = UserSerializer(write_only=True)
-    history = HistorySerializer(write_only=True)
-    history_data = HistorySerializer(read_only=True)
+    history = GoalSerializer(read_only=True,many=True)
     user = UserSerializer(read_only=True)
+    current_BMI = serializers.SerializerMethodField()
     
     class Meta:
         model = Client
@@ -99,24 +99,31 @@ class ClientSerializer(serializers.ModelSerializer):
             'height',
             'points',
             'history',
-            'history_data',
         ]
-
+    
+    def get_current_BMI(self, obj):
+        height = obj.height
+        weight = Goal.objects.get(predicted_date__gt=date.today()).weight
+        return weight / pow(height,2)
+    
     def create(self, validated_data):
         user_data = validated_data.pop('user_profile', None)
-
-        user_data['role'] = 5
-        if user_data is not None:
-            user_serializer = UserSerializer(data=user_data)
-            if user_serializer.is_valid(raise_exception=True):               
-                user = user_serializer.save()
+        try:
+            user_data['role'] = 5
+            if user_data is not None:
+                user_serializer = UserSerializer(data=user_data)
+                if user_serializer.is_valid(raise_exception=True):               
+                    user = user_serializer.save()
+                else:
+                    raise serializers.ValidationError({'error': user_serializer.errors})
             else:
-                raise serializers.ValidationError({'error': user_serializer.errors})
-        else:
-            raise serializers.ValidationError({'error': 'no such user'})
+                raise serializers.ValidationError({'error': 'no data found'})
+        except Exception as e:
+            raise serializers.ValidationError(str(e))
         
         client = Client.objects.create(user=user, **validated_data)
-        return client
+        print(user)
+        return {"client" : client , "user" : user}
     
     def update(self, instance, validated_data):
         user_data = validated_data.pop('user_profile', None)
@@ -130,3 +137,6 @@ class ClientSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+
+        
