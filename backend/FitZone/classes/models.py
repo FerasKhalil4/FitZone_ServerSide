@@ -15,5 +15,7 @@ class Classes(models.Model):
     clients = models.ManyToManyField(Client, related_name='clients')
     hall = models.IntegerField(blank=True)    
     is_deleted = models.BooleanField(default=False)
-
+    image_path = models.ImageField(upload_to="images/", null=True)
+    points = models.IntegerField(default=0)
+    allowed_number_for_class = models.IntegerField(default=0)
     

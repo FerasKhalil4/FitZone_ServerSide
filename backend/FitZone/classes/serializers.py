@@ -4,8 +4,7 @@ from gym.seriailizers import EmployeeSerializer, BranchSerializer
 from gym.models import Employee , Shifts ,Gym , Branch
 from user.serializers import ClientSerializer
 from django.db.models import Q
-from datetime import date
-import json 
+import datetime 
 
 from django.db.models import Count
 from django.db import connection
@@ -19,11 +18,12 @@ class ClassesSerializer(serializers.ModelSerializer):
     end_time = serializers.TimeField(input_formats=["%H:%M:%S"])
     start_date = serializers.DateField(input_formats=["%Y-%m-%d"])
     end_date = serializers.DateField(input_formats=["%Y-%m-%d"])
+    days_of_week = serializers.JSONField(required=True)
     
     class Meta:
         model = Classes
         fields = ['name','description','start_time','end_time','trainer','registration_fee','clients' , 'hall' , 'days_of_week'
-                  ,'start_date','end_date','branch','trainer_id','branch_id']
+                  ,'start_date','end_date','branch','trainer_id','branch_id','image_path','points','allowed_number_for_class']
         
 
     def validate(self, data):
@@ -41,6 +41,8 @@ class ClassesSerializer(serializers.ModelSerializer):
             return {str(day):day_name for day, day_name in days_of_week.items() if day_name in days.values()}
         
         def validate_days(days):
+            if days is None : 
+                raise serializers.ValidationError({'error':'please add the days of the class'})
             if len(days) != len(set(days)):
                 raise serializers.ValidationError({"error": "please check on the days entered"})
             for day in days:
@@ -57,13 +59,25 @@ class ClassesSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({'error': str(e)})
         
         def check_time_validity(gym, start_time, end_time):
-            if start_time >= end_time:
-                raise serializers.ValidationError({'error': 'Invalid start time'})
-            if not (gym.start_hour <= start_time < gym.close_hour) or not (gym.start_hour < end_time <= gym.close_hour):
-                raise serializers.ValidationError({'error': 'please check on the schedule of the gym and the entered class data'})
-        
+            try:
+                if gym.start_hour > gym.close_hour:
+                    if (gym.start_hour <= start_time or start_time < gym.close_hour) and \
+                    (gym.start_hour < end_time or end_time <= gym.close_hour):
+                        return True
+                    else:
+                        raise serializers.ValidationError({'error': 'Please check the schedule of the gym and the entered class data'})
+                
+                elif gym.start_hour < gym.close_hour:
+                    if gym.start_hour <= start_time < gym.close_hour and \
+                    gym.start_hour < end_time <= gym.close_hour:
+                        return True
+                    else:
+                        raise serializers.ValidationError({'error': 'Please check the schedule of the gym and the entered class data'})
+            except Exception as e:
+                raise serializers.ValidationError(str(e))
+            
         def check_date_validity(start_date, end_date):
-            if start_date <= date.today():
+            if start_date <= datetime.date.today():
                 raise serializers.ValidationError('Start date should be greater than or equal to today.')
             if end_date <= start_date:
                 raise serializers.ValidationError('End date should be greater than start date.')
@@ -86,14 +100,12 @@ class ClassesSerializer(serializers.ModelSerializer):
                 start_date__lt = data['end_date'],
                 end_date__gte = data['end_date'],
                  hall=data['hall'],
-                trainer = data['trainer_id'],
             )
             )|(
                 Q(
                 hall = data['hall'],
                 start_date__gte = data['start_date'],
                 end_date__lte = data['end_date'],
-                trainer = data['trainer_id'],
             )
             )
             
@@ -122,6 +134,8 @@ class ClassesSerializer(serializers.ModelSerializer):
         
         if data['registration_fee'] < 0:
             raise serializers.ValidationError({"error": "please check on the registration_fee entered, it must be a positive value"})
+        if data['allowed_number_for_class'] < 0 :
+            raise serializers.ValidationError({"error": "please check on the allowed_number_for_class  must be a positive value"})
         
         used_data = get_used_data(data['days_of_week'])
         

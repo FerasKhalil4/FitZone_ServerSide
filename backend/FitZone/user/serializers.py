@@ -99,6 +99,7 @@ class ClientSerializer(serializers.ModelSerializer):
             'height',
             'points',
             'history',
+            'current_BMI'
         ]
     
     def get_current_BMI(self, obj):

@@ -2,12 +2,19 @@ from rest_framework import generics, status ,serializers
 from rest_framework.response import Response
 from .models import *
 from .serializers import *
+from points.models import Points
+import math
 
+def get_product_points(price):
+    activity = Points.objects.get(activity="Product points percentage").points_percentage
+    return math.ceil(price / activity)
 class ClassesListAV(generics.ListCreateAPIView):
     serializer_class = ClassesSerializer
-    queryset = Classes.objects.all()
+    queryset = Classes.objects.filter(is_deleted=False,branch__is_active=True)
     
     def post(self, request, *args, **kwargs):
+        data = request.data
+        data['points'] = get_product_points(data['registration_fee'])
         serializer = ClassesSerializer(data=request.data ,context = {'request':request})
         if serializer.is_valid():
             serializer.save()

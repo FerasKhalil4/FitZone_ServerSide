@@ -1,13 +1,19 @@
 from rest_framework import serializers
 from user.serializers import UserSerializer
 from user.models import User
-from .models import Gym , Branch , Employee , Woman_Training_Hours , Employee , Shifts
-
+from .models import *
+from django.db.models import Q
+class Registration_FeeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Registration_Fee
+        fields=['gym','fee','type']
+    
+    
 class BranchSerializer(serializers.ModelSerializer):
     address = serializers.CharField(max_length=50)
     class Meta :
         model = Branch
-        fields = ['id','address' , 'has_store' , 'is_active']
+        fields = ['id','address' ,'city','street', 'has_store' , 'is_active']
 
 class WomanHoursSerializer(serializers.ModelSerializer):
     start_hour = serializers.TimeField(format="%H:%M:%S")
@@ -19,6 +25,7 @@ class WomanHoursSerializer(serializers.ModelSerializer):
         fields = ['id','start_hour','end_hour','day_of_week']
         
     def validate(self ,data):
+
         if data.get('start_hour') > data.get('end_hour') :
             raise serializers.ValidationError('Start time should be less than end time')
         return data
@@ -27,16 +34,22 @@ class WomanHoursSerializer(serializers.ModelSerializer):
         gym = validated_data.pop('gym', None)       
         start_hour = validated_data.get('start_hour')
         end_hour = validated_data.get('end_hour')
-        if (start_hour <= gym.start_hour or end_hour >= gym.close_hour) :
-            raise serializers.ValidationError('check on the women scedule')
+        
+        if gym.start_hour > gym.close_hour:
+            if not ((gym.start_hour <= start_hour or start_hour < gym.close_hour) and
+                    (gym.start_hour < end_hour or end_hour <= gym.close_hour)):
+                raise serializers.ValidationError('check on the women scedule')
+            
+        elif gym.close_hour > gym.start_hour: 
+                if not( gym.start_hour <= start_hour < gym.close_hour and \
+                    gym.start_hour < start_hour <= gym.close_hour):
+                    raise serializers.ValidationError('check on the women scedule')
         try:
             day = Woman_Training_Hours.objects.create(gym=gym, **validated_data)
         except Exception as e:
             raise serializers.ValidationError({'error': str(e)})     
         
         return day
-        
-        
         
         
 class GymSerializer(serializers.ModelSerializer):
@@ -53,18 +66,17 @@ class GymSerializer(serializers.ModelSerializer):
     allow_retrival = serializers.BooleanField(write_only=True)
     duration_allowed = serializers.IntegerField(write_only=True , required = False)
     cut_percentage = serializers.FloatField(write_only=True ,required = False)
+    fees = Registration_FeeSerializer(read_only=True,many=True)
     
     class Meta:
         model = Gym
-        fields =['id','allow_public_posts','allow_public_posts','name' , 'description','regestration_price','image_path',
+        fields =['id','allow_public_posts','allow_public_posts','name' , 'description','image_path',
                  'created_at','start_hour','close_hour' ,'mid_day_hour','manager',
                  'manager_id','manager_details','branch','woman_gym','woman_hours',
-                 'allow_retrival', 'duration_allowed', 'cut_percentage']   
+                 'allow_retrival', 'duration_allowed', 'cut_percentage','fees']   
         
         
     def validate(self ,data):
-        if data['regestration_price'] < 0 :
-            raise serializers.ValidationError('Regestration price should be greater than 0')
         if data.get('allow_retrival') == True and (not data.get('duration_allowed') or not data.get('cut_percentage')):
              raise serializers.ValidationError({'error':'please provide the complete data about the dutation and the percentage cut'})
         return data
@@ -110,15 +122,62 @@ class GymSerializer(serializers.ModelSerializer):
     
     
     
+     
+class EmployeeSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(required=False)
+    user = UserSerializer(required=False)
+    user_id = serializers.PrimaryKeyRelatedField(source = 'user', 
+                                                 queryset = User.objects.filter(is_deleted=False) , write_only=True)
+    class Meta:
+        model = Employee
+        fields = ['id','is_trainer','user','user_id','num_of_trainees']
+    
+    def create(self, data):
+        try:
+            user = data.get('user', None)
+            user_id = user.id
+            
+            if user_id is not None:
+                user = User.objects.get(id = user_id) or None
+                
+                if user is not None:
+                    employee = Employee.objects.get(id = user_id)
+                    
+            else:
+                user_data = data.pop('user',None)
+                if user_data is not None :
+                    if data['is_trainer'] == False:
+                        user_data['role'] = 3
+                    else:
+                        user_data['role'] = 4
+                    user_serializer = UserSerializer(data = user_data)
+                    user_serializer.is_valid(raise_exception=True)
+                    user = user_serializer.save()
+                
+                employee = Employee.objects.create(user = user,  **data)
+
+            return employee
+        except Exception as e:
+            raise serializers.ValidationError({'error': str(e)})
+        
 class ShiftSerializer(serializers.ModelSerializer):
     branch = serializers.PrimaryKeyRelatedField(queryset=Branch.objects.filter(is_active=True), write_only=True, required=True)
     branch_details = BranchSerializer(source='branch', read_only=True)
+    employee = EmployeeSerializer(read_only=True)
+    employee_id = serializers.PrimaryKeyRelatedField(source = 'employee',
+                                                    queryset=Employee.objects.filter(user__is_deleted=False), 
+                                                    write_only=True)
     class Meta:
         model = Shifts
-        fields = [ 'shift_type','employee' , 'id', 'branch', 'branch_details', 'is_active', 'days_off']
+        fields = [ 'shift_type','employee' ,'employee_id', 'id', 'branch', 'branch_details', 'is_active', 'days_off']
     
     def validate(self, data):
-        check_overlap_shift = Shifts.objects.filter(employee = data.get('employee'), shift_type = data.get('shift_type'))
+        if data.get('shift_type') not in ['FullTime','Morning','Night']:
+            raise serializers.ValidationError('shift type should be FullTime, Morning or Night')
+        query = (Q(employee = data.get('employee')) 
+                 & (Q(shift_type = data.get('shift_type'))
+                  | Q(shift_type ='FullTime')))
+        check_overlap_shift = Shifts.objects.filter(query)
         if check_overlap_shift.exists():
             raise serializers.ValidationError('there is an overlap, check on the employee shift scheduel')
         return data
@@ -136,39 +195,13 @@ class ShiftSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         employee_id = validated_data.pop('employee')
         shift = Shifts.objects.create(**validated_data, employee=employee_id)
-        return shift        
-class EmployeeSerializer(serializers.ModelSerializer):
-    id = serializers.IntegerField(required=False)
-    shifts = ShiftSerializer(source = 'employee' ,read_only = True , many = True)
-    shift = ShiftSerializer(write_only = True, required = True) #many = True means that the expacted is List
-    user = UserSerializer()
-    start_date = serializers.DateField(input_formats=["%Y-%m-%d"])
-    quit_date = serializers.DateField(input_formats=["%Y-%m-%d"] , required = False)
-    
+        return shift   
+
+class TrainerSerialzier(serializers.ModelSerializer):
+    employee_id = serializers.PrimaryKeyRelatedField(source = "employee",
+                                                     queryset=Employee.objects.filter(user__is_deleted=False)
+                                                     ,write_only=True)
+    employee = EmployeeSerializer(read_only=True)
     class Meta:
-        model = Employee
-        fields = ['id','is_trainer','start_date','quit_date','shift','shifts','user']
-    
-    def create(self, data):
-        user_data = data.pop('user',None)
-        shift = data.pop('shift' , None)
-        if user_data is not None :
-            if data['is_trainer'] == False:
-                user_data['role'] = 3
-            else:
-                user_data['role'] = 4
-            user_serializer = UserSerializer(data = user_data)
-            user_serializer.is_valid(raise_exception=True)
-            user = user_serializer.save()
-        
-        employee = Employee.objects.create(user = user,  **data)
-        
-        if shift is not None:
-            shift['branch'] = shift['branch'].id
-            shift_serializer = ShiftSerializer(data = shift)
-            shift_serializer.is_valid(raise_exception=True)
-            shift = shift_serializer.save(employee = employee )
-        
-        return employee
-    
-    
+        model = Employee 
+        fields= ['id','employee','employee_id','num_of_traineed','allow_public_posts']

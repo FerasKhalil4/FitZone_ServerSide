@@ -11,6 +11,8 @@ urlpatterns = [
     path('branch-detail/<int:pk>/' , branchDetailAV , name ='branchDetail'),
     path('employee/<int:pk>/',employeeListAV , name = 'employeeListAV'),
     path('trainer/',trainerListAV , name = 'TrainerList'),
-    path('trainer/shifts/<int:pk>/' , shiftCreateAV , name = 'shiftCreateAV')
+    path('shifts/<int:pk>/' , shiftCreateAV , name = 'shiftCreateAV'),
+    path('shifts/update/<int:pk>/',shiftUpdateAV, name= 'shiftUpdateAV'),
+    
     
 ]

@@ -22,7 +22,7 @@ class CommentsSerializer(serializers.ModelSerializer):
     clients = serializers.ReadOnlyField(read_only=True, source ='clients.user.username')
     class Meta:
         model = Comments
-        fields = ['comments','clients']
+        fields = ['comment','clients']
         ordering =['created_ata']
         
         

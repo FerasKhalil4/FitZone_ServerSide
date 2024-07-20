@@ -4,7 +4,6 @@ from user.models import User
 class Gym(models.Model):
     name = models.CharField(max_length=30 , unique=True)
     description = models.TextField(max_length=100 , null = True)
-    regestration_price = models.FloatField()
     image_path = models.ImageField(upload_to='images/' , null= True)
     created_at = models.DateTimeField(auto_now_add=True)
     allow_retrival = models.BooleanField(default=False)
@@ -18,7 +17,12 @@ class Gym(models.Model):
     allow_public_posts = models.BooleanField(default=True)
     allow_public_products = models.BooleanField(default=True)
     
-    
+    def __str__(self) -> str:
+        return f"{self.id}:{self.name}"
+class Registration_Fee(models.Model):
+    gym = models.ForeignKey(Gym , on_delete=models.CASCADE,related_name="fees" )
+    type = models.CharField(max_length=50)
+    fee = models.FloatField(default = 0.0)
 class Woman_Training_Hours(models.Model):
     gym = models.ForeignKey(Gym , on_delete=models.CASCADE,related_name="woman_gym" )
     start_hour = models.TimeField()
@@ -31,6 +35,8 @@ class Woman_Training_Hours(models.Model):
 class Branch(models.Model):
     gym = models.ForeignKey(Gym , on_delete=models.CASCADE,related_name="gym" )
     address = models.CharField(max_length=50)
+    city = models.CharField(max_length=50, blank = True)
+    street = models.CharField(max_length=50,blank = True)
     has_store = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     
@@ -43,9 +49,12 @@ class Branch(models.Model):
 class Employee(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE , related_name="user") 
     is_trainer = models.BooleanField(default=False)
-    start_date = models.DateField()
-    quit_date = models.DateField(null=True)
-    
+
+class Trainer(models.Model):
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="trainer")
+    num_of_trainees = models.IntegerField(default=0)
+    allow_public_posts = models.BooleanField(default=True)
+
     
 class Shifts (models.Model):
     employee = models.ForeignKey(Employee , on_delete=models.CASCADE, related_name="employee")

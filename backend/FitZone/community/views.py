@@ -9,9 +9,10 @@ class PostListAV(generics.ListCreateAPIView):
     queryset = Post.objects.filter(is_deleted=False)
     pagination_class = Pagination
     def get(self, request, *args, **kwargs):
-        gym_id = request.data['gym_id']
-        try:
-            posts = Post.objects.filter(gym_id = gym_id)
+        branch_id = request.data['branch_id']
+        try:            
+            posts = Post.objects.filter(poster__employee__branch = branch_id).distinct()
+            print(posts)
             if not posts.exists():
                 return Response({'message':'no posts available'},status=status.HTTP_404_NOT_FOUND)
             serializer = self.get_serializer(posts,many=True)
@@ -64,6 +65,7 @@ class PostDetailAV(generics.RetrieveUpdateDestroyAPIView):
             return Response(serializer.data)
         except Exception as e:
             raise serializers.ValidationError(str(e))
+        
     def put (self, request ,*args, **kwargs):
         data = request.data.copy()
         pk = kwargs.pop('pk',None)
@@ -81,6 +83,20 @@ class PostDetailAV(generics.RetrieveUpdateDestroyAPIView):
         except Exception as e:
             raise serializers.ValidationError(str(e))
         
+    def delete(self, request, *args, **kwargs):
+        try:
+            if request.user.role == 4 :
+                post = self.get_object()
+                employee = Employee.objects.get(user_id = request.user.id)
+                if post.poster == employee.id:
+                    return super().delete(request, *args, **kwargs)
+                else :
+                    return Response({'message':'You are not authorized to delete this post'},status=status.HTTP_403_FORBIDDEN)
+            elif request.user.role == 3 :
+                    return super().delete(request, *args, **kwargs)
+        except Exception as e :
+            return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
+                
     
 postDetailAV = PostDetailAV.as_view()
     

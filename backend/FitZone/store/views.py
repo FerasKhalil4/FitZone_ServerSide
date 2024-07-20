@@ -158,6 +158,12 @@ class AccessoriesListAV(generics.ListCreateAPIView):
                     check = Accessories.objects.filter(product = product, size=detail['size'],color=color).first()
                     if check is not None :
                         accessory_instnace = check
+                        check_data = Branch_products.objects.filter(product_id = accessory_instnace.pk,
+                                            branch = data.get('branch_id'),
+                                            product_type = 'Accessory'
+                                            )
+                        if check_data.exists():
+                            return Response({'message':'branch already has this accessory'}, status=status.HTTP_400_BAD_REQUEST)
                     else:
                         accessory_detail = {}
                         
@@ -169,13 +175,6 @@ class AccessoriesListAV(generics.ListCreateAPIView):
                         accessorySerializer.is_valid(raise_exception=True)
                         accessory_instnace = accessorySerializer.save()                  
                         
-                    check_data = Branch_products.objects.filter(product_id = accessory_instnace.pk,
-                                                                branch = data.get('branch_id'),
-                                                                product_type = 'Accessory'
-                                                                )
-                    if check_data.exists():
-                        return Response({'message':'branch already has this accessory'}, status=status.HTTP_400_BAD_REQUEST)
-                
                     detail['product_branch_id'] = accessory_instnace.pk
                     detail ['product_type'] = 'Accessory'
                     productBranch_serializer = Branch_productSerializer(data=detail)
@@ -215,6 +214,14 @@ class SupplementsListAV(generics.ListCreateAPIView):
             check = Supplements.objects.filter(product = product, weight = data.get('weight'),flavor=data.get('flavor')).first()
             if check is not None:
                 supplement_insntance = check
+                
+            check_data = Branch_products.objects.filter(product_id = supplement_insntance.pk,
+                                                                branch = data.get('branch_id'),
+                                                                product_type = 'Supplement'
+                                                                )
+            if check_data.exists():
+                return Response({'message':'branch already has this Supplement'}, status=status.HTTP_400_BAD_REQUEST)
+            
             else:
                 supplement_details = data.get('supp_data')
                 supplement_details['product_id'] = product
@@ -224,12 +231,6 @@ class SupplementsListAV(generics.ListCreateAPIView):
                 supplementSerializer.is_valid(raise_exception=True)
                 supplement_insntance = supplementSerializer.save()
                 
-            check_data = Branch_products.objects.filter(product_id = supplement_insntance.pk,
-                                                                branch = data.get('branch_id'),
-                                                                product_type = 'Supplement'
-                                                                )
-            if check_data.exists():
-                return Response({'message':'branch already has this Supplement'}, status=status.HTTP_400_BAD_REQUEST)
                 
             details_data['product_branch_id'] = supplement_insntance.pk
             details_data ['product_type'] = 'Supplement'
@@ -259,7 +260,6 @@ class MealListAV(generics.ListCreateAPIView):
             details['points_gained'] =  get_product_points(details.get('price'))
             details['image_path'] = data.get('image_path')  
             
-            # check_product_branch = check_redudncy_branch_product(product,data.get('branch_id'))
             
             meals = data.get('meals',{})
             meals['product_id'] = product

@@ -9,8 +9,10 @@ from rest_framework.serializers import ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import *
 from .permissions import ClientCheck
-from gym.models import Employee , Shifts , Branch
+from gym.models import Employee , Shifts , Branch, Gym
 from gym.seriailizers import EmployeeSerializer  ,ShiftSerializer 
+import datetime
+from django.db.models import Q
 
 class RegistrationAV(APIView):
     def post(self, request, *args, **kwargs):
@@ -55,10 +57,51 @@ class LoginAV(APIView):
                 if account.role == 3 or account.role == 4:
                     try:
                         employee = Employee.objects.get(user_id=account.id)
-                        branch_id = Shifts.objects.get(employee=employee, is_active= True).branch_id
-                        gym_id = Branch.objects.get(id=branch_id).gym_id  
-                        data['branch_id'] = branch_id
-                        data['gym_id'] = gym_id
+                        shifts = Shifts.objects.filter(employee=employee, is_active= True)
+                        full_time = Shifts.objects.filter(employee=employee, is_active= True,shift_type="FullTime") 
+                        
+                        if full_time.exists():
+                            branch_id = full_time.branch_id
+                        else : 
+                            ids = [shift.branch_id for shift in shifts]
+                            branches = Branch.objects.filter(id__in=ids)
+                            gym_ids = [branch.gym_id for branch in branches]
+                            gyms = Gym.objects.filter(id__in=gym_ids)
+                            mid_day_hours = [gym.mid_day_hour for gym in gyms]
+                            now = datetime.datetime.now()
+                            time_str = now.strftime("%H:%M:%S")
+                            current_time = datetime.datetime.strptime(time_str, "%H:%M:%S").time()
+                            
+                            for gym in gyms :
+                                
+                                if gym.start_hour > gym.close_hour :
+                                    if gym.mid_day_hour >  current_time >= gym.start_hour: 
+                                        current_shift = "Morning"
+                                    elif gym.mid_day_hour < current_time or current_time < gym.close_hour :
+                                        current_shift = "Night"
+                                        
+                                elif gym.start_hour < gym.close_hour :
+                                    
+                                    if gym.mid_day_hour >  current_time >= gym.start_hour: 
+                                        current_shift = "Morning"
+                                    elif gym.mid_day_hour <= current_time < gym.close_hour :
+                                        current_shift = "Night"
+                                    
+                                query = Q(employee=employee, shift_type = current_shift, is_active=True) & ~ Q (shift_type = "FullTime" )
+                                shift_check = Shifts.objects.get(query) or None
+                                if shift_check is not None :
+                                    break
+                                
+                            print(shift_check)
+                            branch_id = shift_check.branch_id if shift_check else None
+                            
+                        if branch_id is not None:
+                        
+                            gym_id = Branch.objects.get(id=branch_id).gym_id  
+                            data['branch_id'] = branch_id
+                            data['gym_id'] = gym_id
+                        else : 
+                            return Response({'error':'you cant login check on this date as an employee'})
                     except Exception as e:
                         raise serializers.ValidationError({'error':str(e)})
                 refresh = RefreshToken.for_user(account)
@@ -108,7 +151,7 @@ client_profile = ClientProfile.as_view()
 
 
 
-class EmployeeDetailAV(generics.RetrieveAPIView):
+class EmployeeDetailAV(generics.RetrieveUpdateDestroyAPIView):
     
     serializer_class = EmployeeSerializer  
     
@@ -157,6 +200,8 @@ class EmployeeDetailAV(generics.RetrieveAPIView):
                     "employee_data": employee_serializer.data,
                     "user_data": user_serializer.data
                 })
+        
+        # delete the employee by their managers
     def delete(self, request, *args, **kwargs):
         employee = self.get_object()
         shifts = Shifts.objects.filter(employee=employee)

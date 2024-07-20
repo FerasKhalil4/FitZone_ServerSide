@@ -31,5 +31,5 @@ class likes(models.Model):
 class Comments(models.Model):
     post = models.ForeignKey(Post , on_delete=models.CASCADE, related_name='comments')
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='comments')
-    comment = models.TextField(default="")
+    comment = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
