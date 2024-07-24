@@ -57,3 +57,12 @@ class Equipment_Exercise(models.Model):
     exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE, related_name="equipment")
     equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE, related_name="exercise")
     video_path = models.FileField(upload_to='videos/',null=True)
+    
+class Disease(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    description = models.TextField(max_length=100)
+    
+class Limitations(models.Model):
+    equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE, related_name="diseases")
+    disease = models.ForeignKey(Disease, on_delete=models.CASCADE, related_name="equipments")
+    

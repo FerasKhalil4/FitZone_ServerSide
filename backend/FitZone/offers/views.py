@@ -173,8 +173,15 @@ class OffersListAV(generics.ListAPIView):
 offersList = OffersListAV.as_view()
             
 class FeePercentageOfferListAV(OffersMixin,generics.ListCreateAPIView):
-    queryset = Offer.objects.filter(is_deleted=False , percentage_offers__fee__isnull=False)
+    
     serializer_class = OfferSerializer
+    
+    def get_queryset(self):
+        
+        branch_id = self.kwargs['branch_id']
+        qs = Offer.objects.prefetch_related('percentage_offers').\
+            filter(branch_id = branch_id ,is_deleted=False, percentage_offers__fee__isnull = False)
+        return qs
     
     def post(self, request,branch_id, *args, **kwargs):
         try:
@@ -201,8 +208,15 @@ class FeePercentageOfferListAV(OffersMixin,generics.ListCreateAPIView):
 feePercentageList = FeePercentageOfferListAV.as_view()
           
 class CategoryPercentageOfferListAV( OffersMixin , generics.ListCreateAPIView):
-    queryset = Offer.objects.filter(is_deleted=False , percentage_offers__category__isnull=False)
+
+    
     serializer_class = OfferSerializer
+    
+    def get_queryset(self):
+        branch_id = self.kwargs['branch_id']
+        qs = Offer.objects.select_related('percentage_offers').\
+            filter(branch_id = branch_id ,is_deleted=False, percentage_offers__category__isnull = False)
+        return qs
 
     def post(self, request,branch_id, *args, **kwargs):
         try:
@@ -236,9 +250,14 @@ categoryPercentageList = CategoryPercentageOfferListAV.as_view()
 
 
 class ClassPercentageOfferListAV(OffersMixin, generics.ListCreateAPIView):
-    queryset = Percentage_offer.objects.filter(offer__is_deleted=False ,  class_id__isnull=False)
-    serializer_class = PercentageOfferSerializer
+    serializer_class = OfferSerializer
     
+    def get_queryset(self):
+        branch_id = self.kwargs['branch_id']
+        qs = Offer.objects.select_related('percentage_offers').\
+            filter(branch_id = branch_id ,is_deleted=False, percentage_offers__class_id__isnull = False)
+        return qs
+
     
     def post(self, request,branch_id, *args, **kwargs):
         try:
@@ -264,9 +283,13 @@ class ClassPercentageOfferListAV(OffersMixin, generics.ListCreateAPIView):
 classPercentageList = ClassPercentageOfferListAV.as_view()
 
 class FeePriceOfferListAV(OffersMixin, generics.ListCreateAPIView):
-    serializer_class = PriceOfferSerializer    
-    queryset = Offer.objects.filter(is_deleted=False, price_offers__objects__fee__isnull = False)
+    serializer_class = OfferSerializer    
     
+    def get_queryset(self):
+            branch_id = self.kwargs['branch_id']
+            qs = Offer.objects.select_related('price_offers').\
+                    filter(branch_id = branch_id ,is_deleted=False, price_offers__objects__fee__isnull = False)
+            return qs
 
     def post(self,request, branch_id,*args, **kwargs):
         try:
@@ -280,7 +303,7 @@ class FeePriceOfferListAV(OffersMixin, generics.ListCreateAPIView):
                     return Response({'message': 'No fee sent'}, status = status.HTTP_400_BAD_REQUEST)
                 try:
                     gym_id = Branch.objects.get(pk=branch_id).gym
-                    check_object =Registration_Fee.objects.filter(gym_id = gym_id, pk = data['offer_data']['fee'])
+                    Registration_Fee.objects.filter(gym_id = gym_id, pk = data['offer_data']['fee'])
                 except Registration_Fee.DoesNotExist as e:
                     return Response({'error':str(e)}, status = status.HTTP_400_BAD_REQUEST)
                 self.check_overlapping_price_offers(start_date, end_date,'fee', data['offer_data']['fee'],branch_id)
@@ -297,7 +320,12 @@ feePriceOfferList = FeePriceOfferListAV.as_view()
 
 class ProdcutPriceOfferListAV(OffersMixin, generics.ListCreateAPIView):
     serializer_class = OfferSerializer
-    queryset = Offer.objects.filter(is_deleted=False, price_offers__objects__product__isnull = False)   
+    
+    def get_queryset(self):
+        branch_id = self.kwargs['branch_id']
+        qs = Offer.objects.select_related('price_offers').\
+            filter(branch_id = branch_id ,is_deleted=False, price_offers__objects__product__isnull = False)
+        return qs
 
     def post(self,request,branch_id, *args, **kwargs):
         try:

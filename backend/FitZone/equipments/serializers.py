@@ -7,7 +7,18 @@ from django.urls import reverse
 class ExerciseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Exercise
-        fields = ['id','name','description','muscle_group']        
+        fields = ['id','name','description','muscle_group']
+
+class DiseaseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Disease
+        fields = '__all__'
+        
+class LimitationsSerializer(serializers.ModelSerializer):
+    diseases= DiseaseSerializer(source ='disease',read_only=True)
+    class Meta:
+        model = Limitations
+        fields = ['id','disease','equipment','diseases']
         
         
 class Equipment_ExerciseSerializer(serializers.ModelSerializer):
@@ -20,9 +31,10 @@ class Equipment_ExerciseSerializer(serializers.ModelSerializer):
         
 class EquipmentSerializer(serializers.ModelSerializer):
     exercise = Equipment_ExerciseSerializer(read_only=True,many = True)
+    limitations = LimitationsSerializer(source='diseases',read_only=True,many = True)
     class Meta:
         model = Equipment
-        fields = ['id','name', 'description', 'url', 'qr_code_image','exercise']
+        fields = ['id','name', 'description', 'url', 'qr_code_image','exercise','limitations']
     
     def create(self,validated_data):
         request = self.context.get('request')
@@ -56,7 +68,7 @@ class Diagrams_EquipmentsSerializer(serializers.ModelSerializer):
         
 
 class DiagramSerialzier(serializers.ModelSerializer):
-    equipment = serializers.SerializerMethodField()
+    equipment =  Diagrams_EquipmentsSerializer(read_only=True, many=True)
     
     class Meta:
         model = Diagram

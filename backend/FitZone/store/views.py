@@ -4,9 +4,11 @@ from .models import *
 from .serializers import *
 from .permissions import *
 from gym.models import Employee, Shifts
-from django.db import transaction
+from offers.models import Offer
+from offers.serializers import OfferSerializer
 from points.models import Points
 from .paginations import CustomPagination
+from django.db import transaction
 import math 
         
 def get_product_points(price):
@@ -120,8 +122,7 @@ class Branch_productListAV(generics.ListAPIView):
                     serializer = MealsSerializer(meal)
                     branch_data = serializer.data
                     branch_data['branch_product_id'] = data['id']
-                    data_.append(branch_data)
-                    
+                    data_.append(branch_data)                    
 
             return paginator.get_paginated_response(data_)        
         except Exception as e: 
