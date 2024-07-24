@@ -16,7 +16,9 @@ class Gym(models.Model):
     manager = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manager')
     allow_public_posts = models.BooleanField(default=True)
     allow_public_products = models.BooleanField(default=True)
-    
+    allowed_days_for_registraiton_cancellation = models.IntegerField(default=0)
+    number_of_clients_allowed = models.IntegerField(default=0)
+    current_number_of_clients= models.IntegerField(default=0)
     def __str__(self) -> str:
         return f"{self.id}:{self.name}"
 class Registration_Fee(models.Model):

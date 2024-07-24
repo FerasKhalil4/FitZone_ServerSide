@@ -4,9 +4,10 @@ from user.models import User
 from .models import *
 from django.db.models import Q
 class Registration_FeeSerializer(serializers.ModelSerializer):
+    fee_id = serializers.PrimaryKeyRelatedField(source='id',read_only=True)
     class Meta:
         model = Registration_Fee
-        fields=['gym','fee','type']
+        fields=['gym','fee','type','fee_id']
     
     
 class BranchSerializer(serializers.ModelSerializer):
@@ -73,7 +74,7 @@ class GymSerializer(serializers.ModelSerializer):
         fields =['id','allow_public_posts','allow_public_posts','name' , 'description','image_path',
                  'created_at','start_hour','close_hour' ,'mid_day_hour','manager',
                  'manager_id','manager_details','branch','woman_gym','woman_hours',
-                 'allow_retrival', 'duration_allowed', 'cut_percentage','fees']   
+                 'allow_retrival', 'duration_allowed', 'cut_percentage','fees','number_of_clients_allowed','current_number_of_clients','allowed_days_for_registraiton_cancellation']   
         
         
     def validate(self ,data):
@@ -121,21 +122,22 @@ class GymSerializer(serializers.ModelSerializer):
         return gym
     
     
-    
-     
 class EmployeeSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(required=False)
     user = UserSerializer(required=False)
     user_id = serializers.PrimaryKeyRelatedField(source = 'user', 
-                                                 queryset = User.objects.filter(is_deleted=False) , write_only=True)
+                                                 queryset = User.objects.filter(is_deleted=False) , write_only=True,required=False)
     class Meta:
         model = Employee
-        fields = ['id','is_trainer','user','user_id','num_of_trainees']
+        fields = ['id','is_trainer','user','user_id']
     
     def create(self, data):
         try:
+            print(data)
             user = data.get('user', None)
-            user_id = user.id
+            user_id = None
+            if isinstance(user,User):
+                user_id = user.id
             
             if user_id is not None:
                 user = User.objects.get(id = user_id) or None
@@ -171,6 +173,15 @@ class ShiftSerializer(serializers.ModelSerializer):
         model = Shifts
         fields = [ 'shift_type','employee' ,'employee_id', 'id', 'branch', 'branch_details', 'is_active', 'days_off']
     
+    days_of_week = {
+    1: 'sunday',
+    2: 'monday',
+    3: 'tuesday',
+    4: 'wednesday',
+    5: 'thursday',
+    6: 'friday',
+    7: 'saturday'
+}
     def validate(self, data):
         if data.get('shift_type') not in ['FullTime','Morning','Night']:
             raise serializers.ValidationError('shift type should be FullTime, Morning or Night')
@@ -183,13 +194,17 @@ class ShiftSerializer(serializers.ModelSerializer):
         return data
     
     def validate_days_off(self,data):
+
+      
         days = list(data.values())
         if len(days) != len(set(days)):
             raise serializers.ValidationError({"error":"please check on the days entered"})
         
         for day in data.values():
-            if day not in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday','saturday','sunday']:
+            if day not in self.days_of_week.values():
                 raise serializers.ValidationError(f'{day} is not a valid day of the week')
+        data= {day:day_name for day, day_name in self.days_of_week.items() if day_name in data.values() }
+            
         return data
 
     def create(self, validated_data):
@@ -203,5 +218,5 @@ class TrainerSerialzier(serializers.ModelSerializer):
                                                      ,write_only=True)
     employee = EmployeeSerializer(read_only=True)
     class Meta:
-        model = Employee 
-        fields= ['id','employee','employee_id','num_of_traineed','allow_public_posts']
+        model = Trainer 
+        fields= ['id','employee','employee_id','num_of_trainees','allow_public_posts']

@@ -56,18 +56,26 @@ class LoginAV(APIView):
             if account.check_password(request.data.get('password')):
                 if account.role == 3 or account.role == 4:
                     try:
-                        employee = Employee.objects.get(user_id=account.id)
+                        try:
+                            employee = Employee.objects.get(user_id=account.id)
+                        except Employee.DoesNotExist:
+                            return Response ({'error': 'Account does not exist'},status=status.HTTP_400_BAD_REQUEST)
                         shifts = Shifts.objects.filter(employee=employee, is_active= True)
-                        full_time = Shifts.objects.filter(employee=employee, is_active= True,shift_type="FullTime") 
-                        
-                        if full_time.exists():
+                        full_time = Shifts.objects.filter(employee=employee, is_active= True,shift_type="FullTime").first() 
+                        if full_time is not None:
                             branch_id = full_time.branch_id
-                        else : 
+                            now = datetime.datetime.now().strftime("%A").lower()
+                            days_off = full_time.days_off.values() 
+
+                            if now in days_off:
+                                return Response({'error':'you cant login in you days off'},status=status.HTTP_400_BAD_REQUEST)
+                            
+                        elif shifts: 
                             ids = [shift.branch_id for shift in shifts]
                             branches = Branch.objects.filter(id__in=ids)
                             gym_ids = [branch.gym_id for branch in branches]
                             gyms = Gym.objects.filter(id__in=gym_ids)
-                            mid_day_hours = [gym.mid_day_hour for gym in gyms]
+                            # mid_day_hours = [gym.mid_day_hour for gym in gyms]
                             now = datetime.datetime.now()
                             time_str = now.strftime("%H:%M:%S")
                             current_time = datetime.datetime.strptime(time_str, "%H:%M:%S").time()
@@ -86,14 +94,22 @@ class LoginAV(APIView):
                                         current_shift = "Morning"
                                     elif gym.mid_day_hour <= current_time < gym.close_hour :
                                         current_shift = "Night"
-                                    
-                                query = Q(employee=employee, shift_type = current_shift, is_active=True) & ~ Q (shift_type = "FullTime" )
-                                shift_check = Shifts.objects.get(query) or None
-                                if shift_check is not None :
-                                    break
+                                        
                                 
-                            print(shift_check)
-                            branch_id = shift_check.branch_id if shift_check else None
+                                query = Q(employee=employee, shift_type = current_shift, is_active=True) & ~ Q (shift_type = "FullTime" )
+                                shift_check = Shifts.objects.filter(query).first()
+                                    
+                                if shift_check is not None :
+                                    now = datetime.datetime.now().strftime("%A").lower()
+                                    days_off = shift_check.days_off.values() 
+
+                                    if now in days_off:
+                                        return Response({'error':'you cant login in you days off'},status=status.HTTP_400_BAD_REQUEST)
+                                    break
+
+                            branch_id = shift_check.branch_id if shift_check is not None else None
+                        else:
+                            return Response({'message':'You must ne employed to login'} , status=status.HTTP_400_BAD_REQUEST)
                             
                         if branch_id is not None:
                         
@@ -101,7 +117,7 @@ class LoginAV(APIView):
                             data['branch_id'] = branch_id
                             data['gym_id'] = gym_id
                         else : 
-                            return Response({'error':'you cant login check on this date as an employee'})
+                            return Response({'error':'you cant login now, shift is not allowed'})
                     except Exception as e:
                         raise serializers.ValidationError({'error':str(e)})
                 refresh = RefreshToken.for_user(account)

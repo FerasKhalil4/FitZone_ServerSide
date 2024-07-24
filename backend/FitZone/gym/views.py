@@ -9,9 +9,12 @@ from .models import Gym, Branch , Employee
 from .permissions import admin_permissions  , Manager_permissions, admin_manager_permissions
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
+from community.paginations import Pagination
 class GymListCreateAV(generics.ListCreateAPIView):
     serializer_class = GymSerializer
+    pagination_class = Pagination
     # permission_classes = [IsAuthenticated,admin_permissions]
+    
     def get_queryset(self):
         return Gym.objects.filter(is_deleted = False).all()    
     @transaction.atomic
@@ -177,31 +180,34 @@ class EmployeeListAV(generics.ListCreateAPIView):
     queryset = Employee.objects.all()
     serializer_class = ShiftSerializer  
     # permission_classes = []
-    def get(self, request, pk, format=None):
+    def get(self, request, branch_id, format=None):
         try:
-            shifts = Shifts.objects.filter(branch_id=pk)
+            shifts = Shifts.objects.filter(branch_id=branch_id)
             shift_serializer = ShiftSerializer(shifts , many = True)
             shift_data = shift_serializer.data                     
             return Response(shift_data)
         except Exception as e :
             return Response ({'error': str(e)})
-    @transaction.atomic
-    def post(self, request, pk ,*args , **kwargs):
-        data = request.data 
-        data['is_trainer'] = False
-        data['shift']['branch'] = pk  
-        employee_serializer = EmployeeSerializer(data = data)
-        employee_serializer.is_valid(raise_exception=True)
-        employee = employee_serializer.save()
-        shift = data.pop('shift' , None)
-        if shift is not None:
-            shift['employee_id'] = employee.id
-            shift['branch'] = shift['branch']
-            shift_serializer = ShiftSerializer(data = shift)
-            shift_serializer.is_valid(raise_exception=True)
-            shift = shift_serializer.save()
-        return Response({'message':'employee created successfully',
-            'data': employee_serializer.data }, status= status.HTTP_201_CREATED)
+    def post(self, request, branch_id ,*args , **kwargs):
+        try:
+            with transaction.atomic():
+                data = request.data 
+                data['is_trainer'] = False
+                data['shift']['branch'] = branch_id  
+                employee_serializer = EmployeeSerializer(data = data)
+                employee_serializer.is_valid(raise_exception=True)
+                employee = employee_serializer.save()
+                shift = data.pop('shift' , None)
+                if shift is not None:
+                    shift['employee_id'] = employee.id
+                    shift['branch'] = shift['branch']
+                    shift_serializer = ShiftSerializer(data = shift)
+                    shift_serializer.is_valid(raise_exception=True)
+                    shift = shift_serializer.save()
+                return Response({'message':'employee created successfully',
+                    'data': employee_serializer.data }, status= status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error':'please check on the provided args', 'exception':str(e)}, status=400)
     
 employeeListAV = EmployeeListAV.as_view()
 
@@ -210,48 +216,48 @@ class TrainerListAV(generics.ListCreateAPIView):
     
     def get_queryset(self, id):
         return Employee.objects.filter(is_trainer = True , user__is_deleted= False , employee__branch_id=id)
-    
-    def get(self, request, *args, **kwargs):
+
+    def get(self, request,branch_id, *args, **kwargs):
         try:
-            branch_id = request.data.get('branch_id')
             qs = self.get_queryset(branch_id)
             serializer = self.get_serializer(qs,many=True)
             return Response(serializer.data)
         except Exception as e:
             return Response({'error': str(e)})
-    @transaction.atomic
-    def post(self, request ,*args , **kwargs):
-        
-        data = request.data 
-        data['is_trainer'] = True
-        
-        employee = Employee.objects.get(user=request.user)
-        branch_id = Shifts.objects.filter(employee=employee).first().branch_id
-        data['shift']['branch'] = branch_id 
-        
-        employee_serializer = EmployeeSerializer(data = data)
-        if employee_serializer.is_valid(raise_exception=True):
-            employee = employee_serializer.save()
-        
-        trainer_data = data.pop('trainer_data',None)
-        trainer_data['employee_id'] = employee.id
-        trainer_Serializer = TrainerSerialzier(data=trainer_data)
-        trainer_Serializer.is_valid(raise_exceptions=True)
-        trainer_Serializer.save()
-        
-        shift = data.pop('shift' , None)
-        
-        if shift is not None:
-            
-            shift['employee_id'] = employee.id
-            shift['branch'] = shift['branch']
-            
-            shift_serializer = ShiftSerializer(data = shift)
-            shift_serializer.is_valid(raise_exception=True)
-            shift = shift_serializer.save()
-            
-        return Response({'message':"Trainer Created Successfully",
-                         'data': employee_serializer.data }, status= status.HTTP_201_CREATED)
+
+    def post(self, request ,branch_id,*args , **kwargs):
+        try:    
+            with transaction.atomic():
+                data = request.data 
+                data['is_trainer'] = True
+
+                data['shift']['branch'] = branch_id
+                
+                employee_serializer = EmployeeSerializer(data = data)
+                if employee_serializer.is_valid(raise_exception=True):
+                    employee = employee_serializer.save()
+                trainer_data = data.pop('trainer_data',None)
+                
+                trainer_data['employee_id'] = employee.pk
+                trainer_Serializer = TrainerSerialzier(data=trainer_data)
+                trainer_Serializer.is_valid(raise_exception=True)
+                trainer_Serializer.save()
+                
+                shift = data.pop('shift' , None)
+                
+                if shift is not None:
+                    
+                    shift['employee_id'] = employee.id
+                    shift['branch'] = shift['branch']
+                    
+                    shift_serializer = ShiftSerializer(data = shift)
+                    shift_serializer.is_valid(raise_exception=True)
+                    shift = shift_serializer.save()
+                    
+                return Response({'message':"Trainer Created Successfully",
+                            'data': employee_serializer.data }, status= status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'message':str(e)} , status=status.HTTP_400_BAD_REQUEST)
     
 trainerListAV = TrainerListAV.as_view()
 
@@ -266,14 +272,14 @@ class ShiftsCreateAV(generics.CreateAPIView):
             data['employee'] = pk
             serializer = self.get_serializer(data=data)
             if serializer.is_valid(raise_exception=True):
-                if data.get('shift_type')=="full time":
+                if data.get('shift_type')=="FullTime":
                     shifts = Shifts.objects.filter(employee=pk,is_active=True) or None
                     if shifts is not None:
                         for shift in shifts:
                             shift.is_active = False
                             shift.save()
                 serializer.save()
-                return Response({'message':f"shift created Completly",'data' : serializer.data}, status=status.HTTP_201_CREATED)
+                return Response({'message':"shift created Completly",'data' : serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({'error': str(e)})
 

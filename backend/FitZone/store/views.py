@@ -136,7 +136,7 @@ class AccessoriesListAV(generics.ListCreateAPIView):
     #get all the accessories of the product for the creation process
     
     @transaction.atomic
-    def post(self, request, *args, **kwargs):
+    def post(self, request,branch_id, *args, **kwargs):
         try:
             data = request.data
             product = check_product_data(data)
@@ -146,7 +146,7 @@ class AccessoriesListAV(generics.ListCreateAPIView):
             for color, details in details_data.items():
                 for detail in details:
                     
-                    detail['branch_id'] = data.get('branch_id')
+                    detail['branch_id'] = branch_id
                     detail['price']=data.get('price')
                     detail['points_gained'] =  get_product_points(data.get('price'))
                     detail['image_path'] = data.get('image_path')    
@@ -159,7 +159,7 @@ class AccessoriesListAV(generics.ListCreateAPIView):
                     if check is not None :
                         accessory_instnace = check
                         check_data = Branch_products.objects.filter(product_id = accessory_instnace.pk,
-                                            branch = data.get('branch_id'),
+                                            branch = branch_id,
                                             product_type = 'Accessory'
                                             )
                         if check_data.exists():
@@ -201,12 +201,12 @@ class SupplementsListAV(generics.ListCreateAPIView):
     queryset = Supplements.objects.all()
     serializer_class = SupplementsSerializer
     
-    def post(self, request, *args, **kwargs):
+    def post(self, request,branch_id, *args, **kwargs):
         try:
             data = request.data 
             product = check_product_data(data)
             details_data = data.get('details')
-            details_data['branch_id'] = data.get('branch_id')
+            details_data['branch_id'] = branch_id
             details_data['points_gained'] =  get_product_points(details_data.get('price'))
             details_data['image_path'] = data.get('image_path')  
             
@@ -216,7 +216,7 @@ class SupplementsListAV(generics.ListCreateAPIView):
                 supplement_insntance = check
                 
             check_data = Branch_products.objects.filter(product_id = supplement_insntance.pk,
-                                                                branch = data.get('branch_id'),
+                                                                branch = branch_id,
                                                                 product_type = 'Supplement'
                                                                 )
             if check_data.exists():
@@ -251,12 +251,12 @@ class MealListAV(generics.ListCreateAPIView):
     queryset = Meals.objects.all()
     serializer_class = MealsSerializer
     @transaction.atomic
-    def post(self, request,*args, **kwargs):
+    def post(self, request,branch_id,*args, **kwargs):
         try:
             data = request.data 
             product = check_product_data(data)
             details = data.get('details',{})
-            details['branch_id'] = data.get('branch_id')
+            details['branch_id'] =branch_id
             details['points_gained'] =  get_product_points(details.get('price'))
             details['image_path'] = data.get('image_path')  
             
@@ -268,7 +268,7 @@ class MealListAV(generics.ListCreateAPIView):
             mealSerializer.is_valid(raise_exception=True)
             meal_instance = mealSerializer.save()
             check_data = Branch_products.objects.filter(product_id = meal_instance.pk,
-                                                                branch = data.get('branch_id'),
+                                                                branch =branch_id,
                                                                 product_type = 'Meal'
                                                                 )
             if check_data.exists():

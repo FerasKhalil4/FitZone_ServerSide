@@ -42,6 +42,7 @@ class Diagrams_EquipmentsSerializer(serializers.ModelSerializer):
         model = Diagrams_Equipments
         fields= ['id','equipment','diagram','status','x_axis','y_axis','equipment_details']
         
+        
     def validate(self,data):
         request = self.context.get('request') 
         if request.data.get('branch') and request.data.get('floor') :

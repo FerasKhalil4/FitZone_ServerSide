@@ -58,25 +58,25 @@ class DiagramListAV(generics.ListCreateAPIView):
         except Exception as e:
             raise serializers.ValidationError(str(e))
         
-    @transaction.atomic
     def post(self, request, *args, **kwargs):
         try:
-            data = {}
-            data['branch'] = request.data.get('branch')
-            data['floor'] = request.data.get('floor')
-            
-            diagram_serializer = DiagramSerialzier(data=data, context = {'request': request})
-            if diagram_serializer.is_valid(raise_exception=True):
-                diagram = diagram_serializer.save()
+            with transaction.atomic():
+                data = {}
+                data['branch'] = request.data.get('branch')
+                data['floor'] = request.data.get('floor')
                 
-            for id , positions in request.data.get('equipment').items():
-                for position in positions:
-                    position['equipment'] = id
-                    position['diagram'] = diagram.pk
-                    DE_serializer = Diagrams_EquipmentsSerializer(data=position, context = {'request': request})
-                    if DE_serializer.is_valid(raise_exception=True):
-                        DE_serializer.save()
-            return Response(request.data, status=status.HTTP_201_CREATED)
+                diagram_serializer = DiagramSerialzier(data=data, context = {'request': request})
+                if diagram_serializer.is_valid(raise_exception=True):
+                    diagram = diagram_serializer.save()
+                    
+                for id , positions in request.data.get('equipment').items():
+                    for position in positions:
+                        position['equipment'] = id
+                        position['diagram'] = diagram.pk
+                        DE_serializer = Diagrams_EquipmentsSerializer(data=position, context = {'request': request})
+                        if DE_serializer.is_valid(raise_exception=True):
+                            DE_serializer.save()
+                return Response(request.data, status=status.HTTP_201_CREATED)
         except Exception as e:
             raise serializers.ValidationError(str(e))
             

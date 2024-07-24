@@ -9,8 +9,8 @@ urlpatterns = [
     path('branch/<int:pk>/' , branchAv , name = 'BrancListCreate'),
     path('manager/' , managergymAV , name = 'ManagerGymList'),
     path('branch-detail/<int:pk>/' , branchDetailAV , name ='branchDetail'),
-    path('employee/<int:pk>/',employeeListAV , name = 'employeeListAV'),
-    path('trainer/',trainerListAV , name = 'TrainerList'),
+    path('employee/<int:branch_id>/',employeeListAV , name = 'employeeListAV'),
+    path('trainer/<int:branch_id>/',trainerListAV , name = 'TrainerList'),
     path('shifts/<int:pk>/' , shiftCreateAV , name = 'shiftCreateAV'),
     path('shifts/update/<int:pk>/',shiftUpdateAV, name= 'shiftUpdateAV'),
     

@@ -8,11 +8,9 @@ class PostListAV(generics.ListCreateAPIView):
     serializer_class = PostSerializer
     queryset = Post.objects.filter(is_deleted=False)
     pagination_class = Pagination
-    def get(self, request, *args, **kwargs):
-        branch_id = request.data['branch_id']
+    def get(self, request,gym_id, *args, **kwargs):
         try:            
-            posts = Post.objects.filter(poster__employee__branch = branch_id).distinct()
-            print(posts)
+            posts = Post.objects.filter(gym =gym_id,is_deleted=False).distinct()
             if not posts.exists():
                 return Response({'message':'no posts available'},status=status.HTTP_404_NOT_FOUND)
             serializer = self.get_serializer(posts,many=True)
@@ -25,9 +23,10 @@ class PostListAV(generics.ListCreateAPIView):
     #     query = Q(gym_id=gym_id) | Q(gym__allow_public_posts = True)
     #     posts = Post.objects.filter(query)        
         
-    def post(self, request, *args, **kwargs):
+    def post(self, request,gym_id, *args, **kwargs):
         user = request.user
         data = request.data.copy()
+        data['gym_id'] = gym_id
         images = request.FILES.getlist('images', [])
         videos = request.FILES.getlist('videos', [])
         try:
@@ -57,10 +56,11 @@ postListAV = PostListAV.as_view()
 class PostDetailAV(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = PostSerializer
     queryset = Post.objects.filter(is_deleted=False)
+    
     def get(self ,request ,*args, **kwargs):
         try:
             pk = kwargs.pop('pk',None)
-            post = Post.objects.get(pk=pk)
+            post =self.get_object()
             serializer = self.get_serializer(post)
             return Response(serializer.data)
         except Exception as e:
@@ -70,12 +70,18 @@ class PostDetailAV(generics.RetrieveUpdateDestroyAPIView):
         data = request.data.copy()
         pk = kwargs.pop('pk',None)
         try:
+            instance =self.get_object()
+            
             employee =Employee.objects.get(user= request.user)
             if request.user.role == 3 and 'is_approved' in data :
-                data['approved_by'] = employee.pk
+                instance.is_approved = True
+                instance.approved_by = employee
+                return Response({'message':'post has been approved'},status= status.HTTP_200_OK)
             else:
                 data.pop('is_approved',None)
-            instance = Post.objects.get(pk=pk)
+            if employee.id != instance.poster :
+                return Response({'error':'you are not allowed to update the post'},status= status.HTTP_400_BAD_REQUEST) 
+            
             serializer = self.get_serializer(instance, data = data, partial= True)
             if serializer.is_valid(raise_exception=True):
                 serializer.save()
