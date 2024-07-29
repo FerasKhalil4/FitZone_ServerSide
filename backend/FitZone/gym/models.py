@@ -1,6 +1,7 @@
 from django.db import models
 from user.models import User
 
+
 class Gym(models.Model):
     name = models.CharField(max_length=30 , unique=True)
     description = models.TextField(max_length=100 , null = True)
@@ -21,6 +22,7 @@ class Gym(models.Model):
     current_number_of_clients= models.IntegerField(default=0)
     def __str__(self) -> str:
         return f"{self.id}:{self.name}"
+    
 class Registration_Fee(models.Model):
     gym = models.ForeignKey(Gym , on_delete=models.CASCADE,related_name="fees" )
     type = models.CharField(max_length=50)
@@ -30,9 +32,6 @@ class Woman_Training_Hours(models.Model):
     start_hour = models.TimeField()
     end_hour = models.TimeField()
     day_of_week = models.CharField()
-    
-    
-    
     
 class Branch(models.Model):
     gym = models.ForeignKey(Gym , on_delete=models.CASCADE,related_name="gym" )
@@ -47,7 +46,6 @@ class Branch(models.Model):
             self.is_active = False
             self.save()
     
-
 class Employee(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE , related_name="user") 
     is_trainer = models.BooleanField(default=False)
@@ -56,6 +54,10 @@ class Trainer(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="trainer")
     num_of_trainees = models.IntegerField(default=0)
     allow_public_posts = models.BooleanField(default=True)
+    session_period = models.IntegerField(default=0)
+    private_training_price = models.FloatField(default=0.00)
+    online_trainine_price = models.FloatField(default=0.00)
+    
 
     
 class Shifts (models.Model):
@@ -64,3 +66,6 @@ class Shifts (models.Model):
     shift_type = models.CharField(max_length=50)
     is_active = models.BooleanField(default=True)
     days_off = models.JSONField(default = dict)
+    
+
+    

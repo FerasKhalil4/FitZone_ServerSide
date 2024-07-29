@@ -68,7 +68,6 @@ class PostDetailAV(generics.RetrieveUpdateDestroyAPIView):
         
     def put (self, request ,*args, **kwargs):
         data = request.data.copy()
-        pk = kwargs.pop('pk',None)
         try:
             instance =self.get_object()
             
@@ -79,7 +78,8 @@ class PostDetailAV(generics.RetrieveUpdateDestroyAPIView):
                 return Response({'message':'post has been approved'},status= status.HTTP_200_OK)
             else:
                 data.pop('is_approved',None)
-            if employee.id != instance.poster :
+
+            if employee.id != instance.poster.id :
                 return Response({'error':'you are not allowed to update the post'},status= status.HTTP_400_BAD_REQUEST) 
             
             serializer = self.get_serializer(instance, data = data, partial= True)
@@ -94,7 +94,7 @@ class PostDetailAV(generics.RetrieveUpdateDestroyAPIView):
             if request.user.role == 4 :
                 post = self.get_object()
                 employee = Employee.objects.get(user_id = request.user.id)
-                if post.poster == employee.id:
+                if post.poster.id == employee.id:
                     return super().delete(request, *args, **kwargs)
                 else :
                     return Response({'message':'You are not authorized to delete this post'},status=status.HTTP_403_FORBIDDEN)

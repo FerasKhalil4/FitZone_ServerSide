@@ -38,6 +38,9 @@ class Equipment(models.Model):
 class Diagram(models.Model):
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="diagrams")
     floor = models.IntegerField(default=0)
+    height = models.IntegerField(default=0)
+    width = models.IntegerField(default=0)
+    
 
 class Diagrams_Equipments(models.Model):
     equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE, related_name="diagrams")

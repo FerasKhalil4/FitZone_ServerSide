@@ -8,3 +8,8 @@ class PointsSerializer(serializers.ModelSerializer):
         model = Points
         fields = ['user','activity','points']
         
+        def validate_points(self,data):
+            if data < 0:
+                raise serializers.ValidationError('Points cannot be negative')
+            return data
+        

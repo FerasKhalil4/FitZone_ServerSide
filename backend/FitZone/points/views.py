@@ -6,14 +6,14 @@ from gym.permissions import admin_permissions
 class PointsListAV(generics.ListAPIView):
     serializer_class = PointsSerializer
     queryset = Points.objects.all()
-    permission_classes = [admin_permissions]
+    # permission_classes = [admin_permissions]
 
 pointList = PointsListAV.as_view()
 
 class PointsDetailsAV(generics.RetrieveUpdateAPIView):
     serializer_class = PointsSerializer
     queryset = Points.objects.all()
-    permission_classes = [admin_permissions]
+    # permission_classes = [admin_permissions]
     
     def put(self, request, pk, *args, **kwargs):
         data = request.data 

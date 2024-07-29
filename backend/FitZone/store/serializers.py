@@ -12,7 +12,7 @@ class CategorySerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Category
-        fields = ['name','description']
+        fields = ['id','name','description']
 
 class ProductSerializer (serializers.ModelSerializer):
     category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all())
@@ -20,29 +20,13 @@ class ProductSerializer (serializers.ModelSerializer):
     class Meta:
         model = Product 
         
-        fields = ['id','name','description','category','category_data']    
+        fields = ['id','name','description','category','category_data','brand','image_path']    
 
 class Supplements_CategorySerilaizer(serializers.ModelSerializer):
     class Meta:
         model = Supplements_Category
         fields = '__all__'
     
-# class VariantSerializer(serializers.ModelSerializer):
-#     product_id = serializers.PrimaryKeyRelatedField(source = 'product',
-#                                                     queryset=Product.objects.all(),
-#                                                     write_only=True)
-#     supplement_category =Supplements_CategorySerilaizer(read_only=True)
-#     supplement_category_id = serializers.PrimaryKeyRelatedField(source='supplement_category',
-#                                                                 queryset=Supplements_Category.objects.all(),
-#                                                                 write_only=True,required = False)
-#     product = ProductSerializer(read_only=True)
-#     class Meta:
-#         model=Variants
-#         fields= ['calories','weight','protein','carbs','caffeine',
-#                  'supplement_category','flavor','product_id','supplement_category_id'
-#                  ,'color','size','product']           
-
-
 class AccessoriesSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)
     product_id = serializers.PrimaryKeyRelatedField(source = 'product',
@@ -117,10 +101,11 @@ class Branch_productSerializer(serializers.ModelSerializer):
     branch = BranchSerializer(read_only=True)
     branch_id = serializers.PrimaryKeyRelatedField(source='branch',queryset=Branch.objects.filter(is_active=True),write_only=True)
     product_branch_id = serializers.IntegerField(source = 'product_id')
+    branch_product_id = serializers.IntegerField(source = 'id',read_only=True)
     class Meta:
         model = Branch_products
         
-        fields = ['id','amount','price','points_gained','is_available','image_path'
+        fields = ['branch_product_id','amount','price','points_gained','is_available','image_path'
                   ,'branch','branch_id','product_branch_id','product_type']
         
     unique_together = ('product_type', 'product_id')

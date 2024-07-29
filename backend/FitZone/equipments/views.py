@@ -10,6 +10,36 @@ class DiseasesListAV(generics.ListAPIView):
     
 disease_list = DiseasesListAV.as_view()
     
+class ExerciseListAV(generics.ListAPIView):
+    serializer_class = ExerciseSerializer
+    queryset = Exercise.objects.all()
+    
+excerciseList = ExerciseListAV.as_view()
+
+class EquipmentExerciseListAV(generics.ListAPIView):
+    #exercises for specific branch
+    serializer_class = Equipment_ExerciseSerializer
+    queryset = Equipment_Exercise.objects.all()
+    def get(self, request, *args, **kwargs):
+        exercises = []
+        diagrams =  Diagram.objects.filter(branch = self.kwargs.get('branch_id'))
+        for diagram in diagrams:
+            instances = Diagrams_Equipments.objects.filter(diagram = diagram.pk, status=True).distinct()
+            for instance in instances:
+                exercises_ = Equipment_Exercise.objects.filter(equipment = instance.equipment)
+                serializers = Equipment_ExerciseSerializer(exercises_,many=True)
+                for item in serializers.data:
+                    
+                    if item not in exercises:
+                        exercises.append(item)
+
+        
+        return Response({'data':exercises},status=status.HTTP_200_OK)
+                
+            
+        
+equipment_excerciseList = EquipmentExerciseListAV.as_view()
+    
 class LimitationListAV(generics.ListCreateAPIView):
     serializer_class = LimitationsSerializer
     
@@ -28,6 +58,7 @@ class LimitationListAV(generics.ListCreateAPIView):
             return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
         
 limitationList = LimitationListAV.as_view()
+
 
 class LimitationDetailsAV(generics.RetrieveDestroyAPIView):
     serializer_class = LimitationsSerializer
@@ -92,6 +123,8 @@ class EquipmentsDetailAV(generics.RetrieveAPIView):
     
 Equipment_detailAV = EquipmentsDetailAV.as_view()
 
+
+    
 class DiagramListAV(generics.ListCreateAPIView):
     serializer_class = DiagramSerialzier
     queryset = Diagram.objects.all()
@@ -110,55 +143,85 @@ class DiagramListAV(generics.ListCreateAPIView):
     def post(self, request, *args, **kwargs):
         try:
             with transaction.atomic():
-                data = {}
+                data = request.data
                 branch_id = kwargs.get('branch_id')
-                data['branch_id'] = branch_id
-                data['floor'] = request.data.get('floor')
+                data['branch'] = branch_id
+                diagram = Diagram.objects.filter(branch=branch_id, floor = data.get('floor'))
+                if diagram.exists():
+                    return Response({'error':'Existing diagram'},status=status.HTTP_400_BAD_REQUEST)
                 
                 diagram_serializer = DiagramSerialzier(data=data, context = {'request': request})
                 if diagram_serializer.is_valid(raise_exception=True):
-                    diagram = diagram_serializer.save()
-                    
-                for id , positions in request.data.get('equipment').items():
-                    for position in positions:
-                        position['equipment'] = id
-                        position['diagram'] = diagram.pk
-                        DE_serializer = Diagrams_EquipmentsSerializer(data=position, context = {'request': request})
-                        if DE_serializer.is_valid(raise_exception=True):
-                            DE_serializer.save()
-                return Response(request.data, status=status.HTTP_201_CREATED)
+                    diagram_serializer.save()
+                return Response(diagram_serializer.data, status=status.HTTP_201_CREATED)
         except Exception as e:
             raise serializers.ValidationError(str(e))
             
 diagram_listAV = DiagramListAV.as_view()
 
-class DiagramDetailAV(generics.RetrieveUpdateDestroyAPIView):
+class DiagramDetailAV(generics.RetrieveUpdateAPIView):
     serializer_class = DiagramSerialzier
-    
-    def get_object(self):
-        return Diagram.objects.filter(pk = self.kwargs.get('pk'),branch = self.kwargs.get('branch_id'))
-    def get(self, request, *args, **kwargs):
+    queryset = Diagram.objects.all()
+    def put(self, request, *args, **kwargs):
         try:
-            instance = self.get_object()
-            serializer = self.get_serializer(instance,many=True)
-            return Response(serializer.data)
-        except Exception as e:
-            return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
-    def put(self, request, pk, *args, **kwargs):
-        try:
-            object_ = self.get_object()
-            serializer = self.get_serializer(object_, data=request.data, partial=True)
-            if serializer.is_valid(raise_exception=True):
-                serializer.save()
+            with transaction.atomic():
+                data = request.data
+                existed_equipments = data['existed_equipments']
+                added_equipments = data['added_equipments']
+                equipments_diagram = Diagrams_Equipments.objects.filter(diagram = self.kwargs['diagram_id'])
+                ids = [item.id for item in equipments_diagram]
+                
+                diagram = Diagram.objects.get(id=self.kwargs['diagram_id'])
+                
+                for id , equipment_data in existed_equipments.items():
+                    ids.remove(int(id))
+                    instance = Diagrams_Equipments.objects.get(id=id)
+                    serializer = Diagrams_EquipmentsSerializer(instance,data=equipment_data,partial=True,
+                                                               context = {'diagram':diagram,'instance':instance})
+                    serializer.is_valid(raise_exception=True)
+                    serializer.save()
+                for id , equipment_data in added_equipments.items():
+                    for details in equipment_data:
+                        details['equipment'] = id 
+                        details['diagram'] = self.kwargs['diagram_id']
+                        serializer = Diagrams_EquipmentsSerializer(data=details,partial=True,context = {'diagram':diagram})
+                        serializer.is_valid(raise_exception=True)
+                        serializer.save()
+                for id in ids:
+                    remove_data = Diagrams_Equipments.objects.get(pk = id)
+                    remove_data.is_deleted = True
+                    remove_data.save()
+                    
+                
                 return Response(serializer.data, status = status.HTTP_200_OK)  
         except Exception as e:
             raise serializers.ValidationError(str(e))
 
-    def delete(self, request, pk, *args, **kwargs):
-        object_ = self.get_object()
-        object_.is_deleted = True
-        object_.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
         
 diagram_detailsAV = DiagramDetailAV.as_view()
     
+class DiagramEquipmentsAV(generics.ListCreateAPIView):
+    serializer_class = Diagrams_EquipmentsSerializer
+    queryset = Diagrams_Equipments.objects.all()
+    
+    def get(self, request, *args, **kwargs):
+        qs = Diagram.objects.filter(pk=self.kwargs['diagram_id'])
+        return Response(DiagramSerialzier(qs,many=True).data,status=status.HTTP_200_OK)
+        
+    def post(self, request, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                equipments = request.data['equipment']
+                diagram = Diagram.objects.get(pk=self.kwargs['diagram_id'])
+                for id , positions in equipments.items():
+                    for position in positions:
+                        position['equipment'] = id
+                        position['diagram'] = self.kwargs['diagram_id']
+                        DE_serializer = Diagrams_EquipmentsSerializer(data=position, context = {'diagram':diagram})
+                        if DE_serializer.is_valid(raise_exception=True):
+                            DE_serializer.save()
+                return Response({'success':'equipments added successfully'},status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+diagramEquipmentsCreate = DiagramEquipmentsAV.as_view()

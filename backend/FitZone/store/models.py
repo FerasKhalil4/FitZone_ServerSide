@@ -9,9 +9,11 @@ class Category(models.Model):
 class Product(models.Model):
     
     category = models.ForeignKey(Category , on_delete=models.CASCADE , related_name="category")
-    name = models.CharField(max_length=50 , unique=True)
+    name = models.CharField(max_length=50)
     description = models.TextField(max_length=100)
     is_deleted = models.BooleanField(default=False)
+    brand = models.CharField(max_length=50, null=True)
+    image_path = models.ImageField(upload_to='images/',null=True)
 
 class Supplements_Category(models.Model):
     
@@ -57,6 +59,5 @@ class Branch_products(models.Model):
     price = models.FloatField(default=0.0)
     points_gained = models.IntegerField(default=0)
     image_path = models.ImageField(upload_to='images/' , null = True)
-
 
     
