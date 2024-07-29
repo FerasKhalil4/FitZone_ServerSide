@@ -2,6 +2,9 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Client, Goal
 from datetime import date
+from wallet.serializers import WalletSerializer
+from django.contrib.sites.shortcuts import get_current_site
+from django.urls import reverse        
 
 class UserSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(max_length=100, write_only=True)
@@ -66,19 +69,20 @@ class UserSerializer(serializers.ModelSerializer):
             
         
 class GoalSerializer(serializers.ModelSerializer):
-    client = serializers.IntegerField(write_only=True)
     predicted_date = serializers.DateField(required=True,input_formats=["%Y-%m-%d"])
     class Meta:
         model = Goal
         fields = ['client','weight','goal','goal_weight','predicted_date']
         ordering = ['created_at']
-    
+
     def validate(self, data):
         today = date.today()
         client = self.context.get('client')
         check = Goal.objects.filter(predicted_date__gt = today , client=client)
         if check.exists():
             raise serializers.ValidationError("A future prediction already exists. Please resolve it before creating a new one.")
+        if data['predicted_date'] < today:
+            raise serializers.ValidationError('The date must be in the future')
         return data
         
 class ClientSerializer(serializers.ModelSerializer):
@@ -87,6 +91,7 @@ class ClientSerializer(serializers.ModelSerializer):
     history = GoalSerializer(read_only=True,many=True)
     user = UserSerializer(read_only=True)
     current_BMI = serializers.SerializerMethodField()
+    wallet = WalletSerializer(read_only=True)
     
     class Meta:
         model = Client
@@ -99,19 +104,29 @@ class ClientSerializer(serializers.ModelSerializer):
             'height',
             'points',
             'history',
-            'current_BMI'
+            'current_BMI',
+            'wallet',
+            'image_path',
         ]
     
     def get_current_BMI(self, obj):
-        height = obj.height
-        weight = Goal.objects.get(predicted_date__gt=date.today()).weight
-        return weight / pow(height,2)
+        height = obj.height / 100
+        goal = Goal.objects.filter(client=obj.pk,predicted_date__gt=date.today())
+        if goal.exists():
+            weight = goal.latest('predicted_date').weight
+        
+        
+        return weight / height ** 2
     
     def create(self, validated_data):
         user_data = validated_data.pop('user_profile', None)
+        request = self.context.get('request')
+        base_url = get_current_site(request)
+        
         try:
             user_data['role'] = 5
             if user_data is not None:
+                
                 user_serializer = UserSerializer(data=user_data)
                 if user_serializer.is_valid(raise_exception=True):               
                     user = user_serializer.save()
@@ -121,9 +136,11 @@ class ClientSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({'error': 'no data found'})
         except Exception as e:
             raise serializers.ValidationError(str(e))
-        
         client = Client.objects.create(user=user, **validated_data)
-        print(user)
+        url = f"http://{base_url}{reverse('employeeClientCheck', args=[str(client.pk)])}"
+        client.url = url
+        client.save()
+        
         return {"client" : client , "user" : user}
     
     def update(self, instance, validated_data):

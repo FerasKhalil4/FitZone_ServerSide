@@ -12,6 +12,9 @@ class Client(models.Model):
     app_rate = models.IntegerField(null = True)
     address = models.CharField(null = True)
     qr_code_image = models.ImageField(upload_to = 'qr_codes',null = True)
+    url = models.URLField(blank=True)
+    image_path = models.ImageField(upload_to = 'images/',null = True)
+    
     def generate_qr_code(self,data):
         
         qr = qrcode.QRCode(
@@ -28,13 +31,13 @@ class Client(models.Model):
         qr_file = BytesIO()
         image.save(qr_file, format="PNG")
 
-        file_name = f"{self.name.replace(' ', '_')}.png"
+        file_name = f"{self.user.username.replace(' ', '_')}.png"
         self.qr_code_image.save(file_name, ContentFile(qr_file.getvalue()), save=False)
     
 
     def save(self, *args, **kwargs):
-        if self.user.usermame and self.pk:
-            data = {'id':self.pk , 'username': self.user.username }
+        if self.url:
+            data = self.url
             self.generate_qr_code(data)
         super().save(*args, **kwargs)
 

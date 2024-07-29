@@ -11,38 +11,75 @@ from .serializers import *
 from .permissions import ClientCheck
 from gym.models import Employee , Shifts , Branch, Gym
 from gym.seriailizers import EmployeeSerializer  ,ShiftSerializer 
+from points.models import Points
+from wallet.models import Wallet
+from wallet.serializers import WalletSerializer
 import datetime
 from django.db.models import Q
+from django.db import transaction
+
+def Check_points_offer():
+    check = Points.objects.get(activity = 'First Time Activity')
+    if check.points > 0 :
+        return check.points
+    return 0
 
 class RegistrationAV(APIView):
     def post(self, request, *args, **kwargs):
-        data = {}
-        serializer = ClientSerializer(data=request.data)
-        
-        if serializer.is_valid():
-            account = serializer.save()
-            user_profile = serializer.validated_data['user_profile']
-            user_profile.pop('password', None)
-            data['user'] = user_profile
-            
-            # if user_profile['role'] == 3 or user_profile['role'] == 4:
-            #     employee = Employee.objects.get(user_id=user_profile['id'])
-            #     branch_id = Shifts.objects.get(employee=employee, is_active= True).branch_id
-            #     gym_id = Branch.objects.get(id=branch_id).gym_id
-            #     data['branch_id'] = branch_id
-            #     data['gym_id'] = gym_id
-                #do the same for client
-            refresh = RefreshToken.for_user(account['user'])
-            data['token'] = {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            }
-        else:
-            raise ValidationError({
-                'error': 'Please check your data',
-                'error_message': serializer.errors
-            })
-        return Response(data, status=status.HTTP_201_CREATED)
+        try:
+            with transaction.atomic():
+                data = {}
+                
+                check_offers = Check_points_offer()
+                if check_offers != 0:
+                    data['points'] = check_offers
+                    
+                serializer = ClientSerializer(data=request.data,context = {'request':request})
+                if serializer.is_valid():
+                    account = serializer.save()
+                    user_profile = serializer.validated_data['user_profile']
+                    user_profile.pop('password', None)
+                    data['user'] = user_profile
+                    
+                    goal = request.data['goal']
+                    client= account['client']
+      
+                    goal['client'] = client.pk
+                    goal_Serializer = GoalSerializer(data=goal)
+                    goal_Serializer.is_valid(raise_exception=True)
+                    goal_Serializer.save()
+                    
+                    wallet_data={
+                        'client':client.pk,
+                    }
+                    wallet_serializer = WalletSerializer(data=wallet_data)
+                    wallet_serializer.is_valid(raise_exception=True)
+                    wallet_serializer.save()
+                    
+                    
+                    
+                    # if user_profile['role'] == 3 or user_profile['role'] == 4:
+                    #     employee = Employee.objects.get(user_id=user_profile['id'])
+                    #     branch_id = Shifts.objects.get(employee=employee, is_active= True).branch_id
+                    #     gym_id = Branch.objects.get(id=branch_id).gym_id
+                    #     data['branch_id'] = branch_id
+                    #     data['gym_id'] = gym_id
+                        #do the same for client
+                        
+                    refresh = RefreshToken.for_user(account['user'])
+                    data['token'] = {
+                        'refresh': str(refresh),
+                        'access': str(refresh.access_token),
+                    }
+                else:
+                    raise ValidationError({
+                        'error': 'Please check your data',
+                        'error_message': serializer.errors
+                    })
+                return Response({'data':data,'user_goal':goal_Serializer.data,'message':'you account is created successfully \
+                                 please charge you wallet to use the app effectivly'}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': str(e)},status=status.HTTP_400_BAD_REQUEST)
 
 Registration = RegistrationAV.as_view()
 
@@ -252,3 +289,27 @@ class GoalListAV(generics.CreateAPIView):
             
 GoalListAv = GoalListAV.as_view()
 
+class CLientProfileEmployeeListAV(generics.ListAPIView):
+    serializer_class = ClientSerializer
+    queryset = Client.objects.filter(user__is_deleted=False)
+    
+    def get(self, request, *args, **kwargs):
+        try:
+            client = Client.objects.get(pk =kwargs.get('client_id'))
+            serializer = self.get_serializer(client).data 
+            gender = 'male' if serializer['user']['gender'] == True else 'female'
+            
+            data = {
+                'pk':serializer['id'],
+                'username':serializer['user']['username'],
+                'birth_date':serializer['user']['birth_date'],
+                'age':serializer['user']['age'],
+                'address':serializer['address'],
+                'height':serializer['height'],
+                'gender' : gender, 
+                "image_path":serializer['image_path'],
+            }
+            return Response(data, status=status.HTTP_200_OK)        
+        except Exception as e:
+            return Response(str(e),status=status.HTTP_400_BAD_REQUEST)
+employeeClientCheck = CLientProfileEmployeeListAV.as_view()
