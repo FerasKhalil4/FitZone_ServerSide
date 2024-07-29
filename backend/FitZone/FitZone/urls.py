@@ -22,4 +22,13 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('auth/',include('user.urls')),
     path('gym/',include('gym.urls')),
+    path('store/',include('store.urls')),
+    path('classes/',include('classes.urls')),
+    path('community/',include('community.urls')),
+    path('diagram/',include('equipments.urls')),
+    path('points/',include('points.urls')),
+    path('vouchers/',include('Vouchers.urls')), 
+    path('offers/',include('offers.urls')),
+    path('plans/',include('plans.urls')),
+    path('wallet/',include('wallet.urls')),
 ]+static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -47,14 +47,26 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'drf_spectacular',
+    'corsheaders',
+    'django_filters',
     #internal apps
-    'user',
+    'classes',
+    'community',
     'gym',
+    'store',
+    'user',  
+    'equipments',
+    'points',
+    'Vouchers',
+    'offers',
+    'plans',
+    'wallet',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -81,6 +93,13 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'FitZone.wsgi.application'
+# CORS_URL_REGEX = r"^/api/.*" this is used to make sure that the requests only goes to the api/ endpoint
+if DEBUG:
+    CORS_ALLOWED_ORIGINS =[
+        'http://localhost:3000',
+        'https://localhost:3000',
+        
+    ]
 
 
 # Database
