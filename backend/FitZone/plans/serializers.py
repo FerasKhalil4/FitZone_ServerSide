@@ -50,4 +50,3 @@ class TrainingPlanSerializer(serializers.ModelSerializer):
         fields = ['plan_id','notes','workouts','planGym']
 
 
-

@@ -3,12 +3,29 @@ from rest_framework.response import Response
 from .serializers import *
 from community.paginations import Pagination
 from django.db import transaction
+from django.db.models import Q
 
-class DiseasesListAV(generics.ListAPIView):
-    serializer_class = DiseaseSerializer
-    queryset = Disease.objects.all()
-    
-disease_list = DiseasesListAV.as_view()
+class ExercisesMixin():
+    def exercises_list(self, equipments, trainer=None):
+        try:
+            exercises = []
+            trainer = trainer.pk if trainer is not None else None
+            query = Q(
+                trainer=trainer
+            )
+            print(equipments)
+            for instance in equipments:
+                query |= Q(equipment = instance.equipment)
+                exercises_ = Equipment_Exercise.objects.filter(query).distinct('equipment','exercise','trainer')
+                serializer = Equipment_ExerciseSerializer(exercises_,many=True)
+                for item in serializer.data:
+                    if item not in exercises_:
+                        exercises.append(item)
+            return exercises
+        except Exception as e:
+            raise serializers.ValidationError(str(e))
+        
+
     
 class ExerciseListAV(generics.ListAPIView):
     serializer_class = ExerciseSerializer
@@ -16,56 +33,49 @@ class ExerciseListAV(generics.ListAPIView):
     
 excerciseList = ExerciseListAV.as_view()
 
-class EquipmentExerciseListAV(generics.ListAPIView):
-    #exercises for specific branch
+class EquipmentExerciseListAV(ExercisesMixin,generics.ListCreateAPIView):
     serializer_class = Equipment_ExerciseSerializer
     queryset = Equipment_Exercise.objects.all()
     def get(self, request, *args, **kwargs):
-        exercises = []
-        diagrams =  Diagram.objects.filter(branch = self.kwargs.get('branch_id'))
-        for diagram in diagrams:
-            instances = Diagrams_Equipments.objects.filter(diagram = diagram.pk, status=True).distinct()
-            for instance in instances:
-                exercises_ = Equipment_Exercise.objects.filter(equipment = instance.equipment)
-                serializers = Equipment_ExerciseSerializer(exercises_,many=True)
-                for item in serializers.data:
-                    
-                    if item not in exercises:
-                        exercises.append(item)
-
-        
-        return Response({'data':exercises},status=status.HTTP_200_OK)
+        equipments = Diagrams_Equipments.objects.filter(diagram__branch = self.kwargs.get('branch_id') 
+                                                        , status =True).distinct('equipment')   
+        user = request.user
+        trainer = None
+        if request.user.role == 4:
+            trainer = Trainer.objects.get(employee__user = user)
+            exercises = self.exercises_list(equipments, trainer)
+        else:
+            exercises = self.exercises_list(equipments)
+        return Response({'data':exercises},status=status.HTTP_200_OK)  
+            
+    def post(self, request, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                user = request.user
+                equipments = request.data.pop('equipments')
+                if 'exercise_id' in request.data:
+                    exercise = Exercise.objects.get(id=request.data['exercise_id'])
+                elif 'exercise_id' not in request.data:
+                    exercise_serialzier = ExerciseSerializer(data=request.data)
+                    exercise_serialzier.is_valid(raise_exception=True)
+                    exercise = exercise_serialzier.save()
+                else :
+                    return Response({'error':'please provide a valid exercise data or exercise id'}, status=status.HTTP_400_BAD_REQUEST)
+                trainer = Trainer.objects.get(employee__user = user)
+                
+                for equipment in equipments:
+                    equipment['exercise'] = exercise.pk
+                    equipment['trainer'] = trainer.pk
+                    serializer = self.get_serializer(data=equipment)
+                    serializer.is_valid(raise_exception=True)
+                    serializer.save()
+                return Response({'success':'exercise created successfully'},status=status.HTTP_201_CREATED)                    
+        except Exception as e:
+            return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)   
                 
             
         
 equipment_excerciseList = EquipmentExerciseListAV.as_view()
-    
-class LimitationListAV(generics.ListCreateAPIView):
-    serializer_class = LimitationsSerializer
-    
-    def get_queryset(self):
-        return Limitations.objects.filter(equipment = self.kwargs.get('equipment_pk'))
- 
-    def post (self, request, equipment_pk, *args, **kwargs):
-        try:
-            data = request.data
-            data['equipment'] = equipment_pk
-            serializer = self.get_serializer(data=data)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        except Exception as e:
-            return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
-        
-limitationList = LimitationListAV.as_view()
-
-
-class LimitationDetailsAV(generics.RetrieveDestroyAPIView):
-    serializer_class = LimitationsSerializer
-    queryset = Limitations.objects.all()
-    
-limitationDetails = LimitationDetailsAV.as_view()
-        
 
 class EquipmentsListAV(generics.ListCreateAPIView):
     serializer_class = EquipmentSerializer
@@ -225,3 +235,6 @@ class DiagramEquipmentsAV(generics.ListCreateAPIView):
             return Response({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 diagramEquipmentsCreate = DiagramEquipmentsAV.as_view()
+
+
+

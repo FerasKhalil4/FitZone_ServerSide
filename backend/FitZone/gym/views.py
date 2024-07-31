@@ -307,3 +307,11 @@ class ShiftsUpdateAV(generics.RetrieveAPIView):
         except Exception as e:
             raise serializers.ValidationError(str(e))
 shiftUpdateAV = ShiftsUpdateAV.as_view()
+
+class Registration_feeListAV(generics.ListAPIView):
+    serializer_class = Registration_FeeSerializer
+    
+    def get_queryset(self):
+        return Registration_Fee.objects.filter(gym_id=self.kwargs['gym_id'])
+    
+fee_list = Registration_feeListAV.as_view()

@@ -9,6 +9,8 @@ from rest_framework.serializers import ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import *
 from .permissions import ClientCheck
+from .DataExample import * 
+from disease.serializers import Client_DiseaseSerilaizer
 from gym.models import Employee , Shifts , Branch, Gym
 from gym.seriailizers import EmployeeSerializer  ,ShiftSerializer 
 from points.models import Points
@@ -24,7 +26,13 @@ def Check_points_offer():
         return check.points
     return 0
 
-class RegistrationAV(APIView):
+class RegistrationAV(generics.CreateAPIView):
+    serializer_class = ClientSerializer
+    queryset = Client.objects.all()
+    @extend_schema(
+        summary='Client Registration',
+        examples=registration
+    )
     def post(self, request, *args, **kwargs):
         try:
             with transaction.atomic():
@@ -55,9 +63,18 @@ class RegistrationAV(APIView):
                     wallet_serializer = WalletSerializer(data=wallet_data)
                     wallet_serializer.is_valid(raise_exception=True)
                     wallet_serializer.save()
-                    
-                    
-                    
+                    diseases = request.data.pop('diseases')
+                    if len(diseases) != 0:
+                        for disease in diseases:
+                            disease_ = {
+                                'client':client.pk,
+                                'disease':disease,
+                            }
+                            serilaizer = Client_DiseaseSerilaizer(data=disease_)
+                            serilaizer.is_valid(raise_exception=True)
+                            serilaizer.save()
+                            
+       
                     # if user_profile['role'] == 3 or user_profile['role'] == 4:
                     #     employee = Employee.objects.get(user_id=user_profile['id'])
                     #     branch_id = Shifts.objects.get(employee=employee, is_active= True).branch_id
@@ -99,6 +116,7 @@ class LoginAV(APIView):
                             return Response ({'error': 'Account does not exist'},status=status.HTTP_400_BAD_REQUEST)
                         shifts = Shifts.objects.filter(employee=employee, is_active= True)
                         full_time = Shifts.objects.filter(employee=employee, is_active= True,shift_type="FullTime").first() 
+                        
                         if full_time is not None:
                             branch_id = full_time.branch_id
                             now = datetime.datetime.now().strftime("%A").lower()
@@ -112,27 +130,29 @@ class LoginAV(APIView):
                             branches = Branch.objects.filter(id__in=ids)
                             gym_ids = [branch.gym_id for branch in branches]
                             gyms = Gym.objects.filter(id__in=gym_ids)
-                            # mid_day_hours = [gym.mid_day_hour for gym in gyms]
                             now = datetime.datetime.now()
                             time_str = now.strftime("%H:%M:%S")
                             current_time = datetime.datetime.strptime(time_str, "%H:%M:%S").time()
-                            
                             for gym in gyms :
-                                
-                                if gym.start_hour > gym.close_hour :
+                                current_shift = None
+                                if gym.start_hour >= gym.close_hour :
+
                                     if gym.mid_day_hour >  current_time >= gym.start_hour: 
                                         current_shift = "Morning"
                                     elif gym.mid_day_hour < current_time or current_time < gym.close_hour :
+                                        
                                         current_shift = "Night"
                                         
                                 elif gym.start_hour < gym.close_hour :
-                                    
-                                    if gym.mid_day_hour >  current_time >= gym.start_hour: 
+                                    if gym.mid_day_hour >  current_time >= gym.start_hour:
+                                         
                                         current_shift = "Morning"
                                     elif gym.mid_day_hour <= current_time < gym.close_hour :
-                                        current_shift = "Night"
                                         
-                                
+                                        current_shift = "Night"
+                                if current_shift is None:
+                                        return Response({'error':'you cant login now, the gym is closed'}, status = status.HTTP_400_BAD_REQUEST)
+
                                 query = Q(employee=employee, shift_type = current_shift, is_active=True) & ~ Q (shift_type = "FullTime" )
                                 shift_check = Shifts.objects.filter(query).first()
                                     
@@ -272,7 +292,7 @@ employeeDetailAV = EmployeeDetailAV.as_view()
 
 class GoalListAV(generics.CreateAPIView):
     serializer_class = GoalSerializer
-    queryset = Goal.objects.all()
+    queryset = Goal.objects.filter(is_deleted=False)
     def post(self, request, pk, *args, **kwargs):
         data = request.data
         try:
@@ -280,7 +300,8 @@ class GoalListAV(generics.CreateAPIView):
             data['client']=client.id
             
             serializer = GoalSerializer(data = data, context = {'request': request,'client': client})
-            data['current_BMI'] = data['weight'] / pow(client.height, 2)
+            height = client.height / 100
+            data['current_BMI'] = data['weight'] / pow(height, 2)
             if serializer.is_valid(raise_exception=True):                
                 serializer.save()
                 return Response(serializer.data, status= status.HTTP_201_CREATED)
@@ -288,7 +309,27 @@ class GoalListAV(generics.CreateAPIView):
             raise serializers.ValidationError(str(e))
             
 GoalListAv = GoalListAV.as_view()
+class GoalDetailDetailsAV(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = GoalSerializer
+    queryset = Goal.objects.filter(is_deleted=False)
+    
+    def put(self, request, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                data=request.data
+                instance=self.get_object()
+                serializer = self.get_serializer(instance, data=data,partial=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+                return Response({'success':'goal is updated successfully'},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
+GoalDetailDetails = GoalDetailDetailsAV.as_view()
 
+    
+@extend_schema(
+    summary='client Profilte shown to the employee'
+)
 class CLientProfileEmployeeListAV(generics.ListAPIView):
     serializer_class = ClientSerializer
     queryset = Client.objects.filter(user__is_deleted=False)

@@ -1,4 +1,5 @@
 from django.db import models
+from django.apps import apps
 from django.contrib.auth.models import User 
 import qrcode
 from io import BytesIO
@@ -45,15 +46,26 @@ class Client(models.Model):
         if self.user:
             self.user.is_deleted = True
             self.user.save()
-        # super(Client, self).delete(*args, **kwargs) delete the record
 
-class Goal (models.Model):
+class Goal (models.Model):    
+    MAX_UPDATES = 3
+    
     client = models.ForeignKey(Client , on_delete=models.CASCADE , related_name= "history")
     weight =models.FloatField(default=0.0)
     goal = models.CharField(max_length=50)
     goal_weight = models.FloatField(default=0.0)
     predicted_date = models.DateField(blank=True)
     created_at = models.DateField(auto_now_add=True)
-    
+    status = models.CharField(max_length=20, default='Active')
+    is_deleted = models.BooleanField(default=False)
+    number_updates = models.PositiveIntegerField(default=MAX_UPDATES)
+    achieved_weight=  models.FloatField(null=True)
+    def save(self, *args, **kwargs):
+        if self.number_updates is None:
+            self.number_updates = self.MAX_UPDATES
+        super().save(*args, **kwargs)
 
-    
+    def delete(self, *args, **kwargs):
+        if self:
+            self.is_deleted = True
+            self.save()

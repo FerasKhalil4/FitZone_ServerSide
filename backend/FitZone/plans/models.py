@@ -39,3 +39,4 @@ class Client_TrianingPlan(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="PrivateTrainingPlans")
     Trainer = models.ForeignKey(Trainer, on_delete=models.CASCADE, related_name="clientsPlans")
     training_plan = models.OneToOneField(Training_plan, on_delete=models.CASCADE, related_name="TrainersClientsPlans")    
+    

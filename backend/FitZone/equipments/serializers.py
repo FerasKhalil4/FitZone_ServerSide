@@ -2,40 +2,31 @@ from rest_framework import serializers
 from .models import *
 from django.contrib.sites.shortcuts import get_current_site
 from django.urls import reverse        
-
+from disease.serializers import LimitationsSerializer
 
 class ExerciseSerializer(serializers.ModelSerializer):
+    exercise_id = serializers.PrimaryKeyRelatedField(source='id',read_only=True)
     class Meta:
         model = Exercise
-        fields = ['id','name','description','muscle_group']
+        fields = ['exercise_id','name','description','muscle_group']
 
-class DiseaseSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Disease
-        fields = '__all__'
-        
-class LimitationsSerializer(serializers.ModelSerializer):
-    diseases= DiseaseSerializer(source ='disease',read_only=True)
-    limitation_id = serializers.PrimaryKeyRelatedField(source = 'id',read_only=True)
-    class Meta:
-        model = Limitations
-        fields = ['limitation_id','disease','equipment','diseases']
-        
-        
+
 class Equipment_ExerciseSerializer(serializers.ModelSerializer):
     video_path = serializers.FileField(required=False)
     exercise_details = ExerciseSerializer(source = "exercise",read_only=True )
     exercise = serializers.PrimaryKeyRelatedField(queryset = Exercise.objects.all(),write_only=True)
     class Meta:
         model = Equipment_Exercise
-        fields = ['id','equipment','exercise','video_path','exercise_details']
+        fields = ['id','equipment','exercise','video_path','exercise_details','trainer']
         
 class EquipmentSerializer(serializers.ModelSerializer):
     exercise = Equipment_ExerciseSerializer(read_only=True,many = True)
     limitations = LimitationsSerializer(source='diseases',read_only=True,many = True)
+    equipment_id = serializers.PrimaryKeyRelatedField(source = 'id', read_only = True)
+    excerises = ExerciseSerializer(source = 'Equipment_Exercise.exercise',read_only=True,many = True)
     class Meta:
         model = Equipment
-        fields = ['id','name', 'description', 'url', 'qr_code_image','exercise','limitations']
+        fields = ['equipment_id','name', 'description', 'url', 'qr_code_image','exercise','limitations','excerises']
     
     def create(self,validated_data):
         request = self.context.get('request')

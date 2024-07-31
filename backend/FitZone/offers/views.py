@@ -1,8 +1,10 @@
 from rest_framework import generics, status
 from rest_framework.response import Response
 from .serializers import *
+from .DataExamples import *
 from community.paginations import Pagination
 from django.db import transaction
+from drf_spectacular.utils import extend_schema
 
 class OffersMixin():
     
@@ -161,17 +163,27 @@ class OffersMixin():
         except Exception as e:
             raise serializers.ValidationError(str(e))
         
+@extend_schema(
+summary="get all the offers related to a given branch"
+)
 class OffersListAV(generics.ListAPIView):
     serializer_class = OfferSerializer
+
     def get_queryset(self):
         branch_id = self.kwargs['branch_id']
         current_data = datetime.datetime.now().date()
         return Offer.objects.filter(is_deleted=False,branch_id = branch_id,
                                      end_date__gte = current_data)
     pagination_class = Pagination
+    
 
 offersList = OffersListAV.as_view()
             
+
+
+@extend_schema(
+summary="get all the fee percetnage offers related to a given branch"
+)
 class FeePercentageOfferListAV(OffersMixin,generics.ListCreateAPIView):
     
     serializer_class = OfferSerializer
@@ -183,6 +195,11 @@ class FeePercentageOfferListAV(OffersMixin,generics.ListCreateAPIView):
             filter(branch_id = branch_id ,is_deleted=False, percentage_offers__fee__isnull = False)
         return qs
     
+    
+    @extend_schema(
+    summary="create fee percetnage offers related to a given branch",
+    examples=fee_percentage_creation
+    )
     def post(self, request,branch_id, *args, **kwargs):
         try:
             with transaction.atomic():
@@ -207,6 +224,9 @@ class FeePercentageOfferListAV(OffersMixin,generics.ListCreateAPIView):
 
 feePercentageList = FeePercentageOfferListAV.as_view()
           
+@extend_schema(
+summary="get all the category percetnage offers related to a given branch"
+)
 class CategoryPercentageOfferListAV( OffersMixin , generics.ListCreateAPIView):
 
     
@@ -218,6 +238,11 @@ class CategoryPercentageOfferListAV( OffersMixin , generics.ListCreateAPIView):
             filter(branch_id = branch_id ,is_deleted=False, percentage_offers__category__isnull = False)
         return qs
 
+
+    @extend_schema(
+    summary="create fee percetnage offers related to a given branch",
+    examples=category_percentage_creation
+    )
     def post(self, request,branch_id, *args, **kwargs):
         try:
             with transaction.atomic():
@@ -249,6 +274,10 @@ class CategoryPercentageOfferListAV( OffersMixin , generics.ListCreateAPIView):
 categoryPercentageList = CategoryPercentageOfferListAV.as_view()
 
 
+
+@extend_schema(
+summary="get all the class percetnage offers related to a given branch"
+)
 class ClassPercentageOfferListAV(OffersMixin, generics.ListCreateAPIView):
     serializer_class = OfferSerializer
     
@@ -258,7 +287,12 @@ class ClassPercentageOfferListAV(OffersMixin, generics.ListCreateAPIView):
             filter(branch_id = branch_id ,is_deleted=False, percentage_offers__class_id__isnull = False)
         return qs
 
-    
+
+    @extend_schema(
+    summary="create class percetnage offers related to a given branch",
+    examples= class_offer_percetage
+    )
+
     def post(self, request,branch_id, *args, **kwargs):
         try:
             with transaction.atomic():
@@ -282,6 +316,9 @@ class ClassPercentageOfferListAV(OffersMixin, generics.ListCreateAPIView):
 
 classPercentageList = ClassPercentageOfferListAV.as_view()
 
+@extend_schema(
+summary="get all the fee price offers related to a given branch"
+)
 class FeePriceOfferListAV(OffersMixin, generics.ListCreateAPIView):
     serializer_class = OfferSerializer    
     
@@ -291,6 +328,10 @@ class FeePriceOfferListAV(OffersMixin, generics.ListCreateAPIView):
                     filter(branch_id = branch_id ,is_deleted=False, price_offers__objects__fee__isnull = False)
             return qs
 
+    @extend_schema(
+    summary="create fee price offers related to a given branch",
+    examples=fee_price_offers
+    )
     def post(self,request, branch_id,*args, **kwargs):
         try:
             with transaction.atomic():
@@ -318,6 +359,10 @@ class FeePriceOfferListAV(OffersMixin, generics.ListCreateAPIView):
 feePriceOfferList = FeePriceOfferListAV.as_view()
 
 
+
+@extend_schema(
+summary="get all the products price offers related to a given branch"
+)
 class ProdcutPriceOfferListAV(OffersMixin, generics.ListCreateAPIView):
     serializer_class = OfferSerializer
     
@@ -326,7 +371,12 @@ class ProdcutPriceOfferListAV(OffersMixin, generics.ListCreateAPIView):
         qs = Offer.objects.select_related('price_offers').\
             filter(branch_id = branch_id ,is_deleted=False, price_offers__objects__product__isnull = False)
         return qs
-
+    @extend_schema(
+    summary="create products price offers related to a given branch",
+    
+    examples=prouduct_price_offers
+    
+    )
     def post(self,request,branch_id, *args, **kwargs):
         try:
             with transaction.atomic():
@@ -355,9 +405,18 @@ class ProdcutPriceOfferListAV(OffersMixin, generics.ListCreateAPIView):
 productPriceOfferList = ProdcutPriceOfferListAV.as_view()
                     
 
+
+@extend_schema(
+summary="get specific percentage offer"
+)
 class PercentageOfferDetailsAV(OffersMixin,generics.RetrieveUpdateAPIView):
+    serializer_class=OfferSerializer
     queryset = Offer.objects.select_related('percentage_offers').filter(is_deleted=False)
         
+    @extend_schema(
+    summary="update specific percentage offer",
+    examples=update_percentage_offer
+    )
     def put(self, request,pk,branch_id, *args, **kwargs):
         try:
             with transaction.atomic():
@@ -385,10 +444,17 @@ class PercentageOfferDetailsAV(OffersMixin,generics.RetrieveUpdateAPIView):
 percentageDetails = PercentageOfferDetailsAV.as_view()
 
 
+@extend_schema(
+summary="get specific price offer"
+)
 class PriceOfferDetailsAV(OffersMixin,generics.RetrieveUpdateAPIView):
     queryset = Offer.objects.select_related('price_offers').filter(is_deleted=False)
     serializer_class = OfferSerializer
         
+    @extend_schema(
+    summary="update specific price offer",
+    examples=update_price_offers
+    )
     def put(self, request,pk,branch_id, *args, **kwargs):
         try:
             with transaction.atomic():
@@ -429,6 +495,9 @@ class PriceOfferDetailsAV(OffersMixin,generics.RetrieveUpdateAPIView):
         
 priceDetails = PriceOfferDetailsAV.as_view()
 
+@extend_schema(
+summary="delete specific offer"
+)
 class DestroyOffersAV(generics.DestroyAPIView):
     queryset = Offer.objects.filter(is_deleted=False)
     serializer_class = OfferSerializer

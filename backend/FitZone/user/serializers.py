@@ -4,7 +4,9 @@ from .models import Client, Goal
 from datetime import date
 from wallet.serializers import WalletSerializer
 from django.contrib.sites.shortcuts import get_current_site
-from django.urls import reverse        
+from django.urls import reverse
+from django.db.models import Q
+import datetime
 
 class UserSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(max_length=100, write_only=True)
@@ -70,10 +72,12 @@ class UserSerializer(serializers.ModelSerializer):
         
 class GoalSerializer(serializers.ModelSerializer):
     predicted_date = serializers.DateField(required=True,input_formats=["%Y-%m-%d"])
+    is_deleted = serializers.BooleanField(write_only=True,required=False)
     class Meta:
         model = Goal
-        fields = ['client','weight','goal','goal_weight','predicted_date']
+        fields = ['client','weight','goal','goal_weight','predicted_date','status','is_deleted','number_updates','achieved_weight']
         ordering = ['created_at']
+        read_only_fields = ['number_updates','status']
 
     def validate(self, data):
         today = date.today()
@@ -81,9 +85,45 @@ class GoalSerializer(serializers.ModelSerializer):
         check = Goal.objects.filter(predicted_date__gt = today , client=client)
         if check.exists():
             raise serializers.ValidationError("A future prediction already exists. Please resolve it before creating a new one.")
-        if data['predicted_date'] < today:
-            raise serializers.ValidationError('The date must be in the future')
+        if 'predicted_date' in data : 
+            if data['predicted_date'] < today:
+                raise serializers.ValidationError('The date must be in the future')
+        if 'goal' in data: 
+            if data['goal'] not in ['Lose Weight','Maintain Weight','Gain Weight']:
+                raise serializers.ValidationError('please provide valid goal : Lose Weight, Maintain Weight, Gain Weight')
         return data
+    
+    def update(self, instance ,data):
+        try:
+            today = date.today()
+            if instance.predicted_date > today:
+                if instance.number_updates == 0 :
+                    raise serializers.ValidationError('you cant update the goal any more please stay discipline and consistent to achieve your goal')
+                data.pop('achieved_weight')
+                for attr, value in data.items():
+                    setattr(instance, attr, value)
+                instance.number_updates -= 1
+                instance.save()
+                return instance
+            else : 
+                if instance.achieved_weight is None:
+                    if 'achieved_weight' in data :
+                        if (data['achieved_weight'] >= instance.goal_weight  and instance.goal == 'Gain Weight')or \
+                        data['achieved_weight'] <= instance.goal_weight  and instance.goal == 'Lose Weight' :
+                            status = 'Achieved' 
+                        else:
+                            status = 'Missed'
+                        instance.achieved_weight = data['achieved_weight']
+                        instance.status = status
+                        instance.save()
+                        return instance
+                    else : 
+                        raise serializers.ValidationError('you cant update but the status and the achieved weight')
+
+                else:
+                    raise serializers.ValidationError('you cant update this goal')
+        except Exception as e :
+            raise serializers.ValidationError(str(e))
         
 class ClientSerializer(serializers.ModelSerializer):
     points = serializers.IntegerField(read_only=True)
@@ -92,6 +132,7 @@ class ClientSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     current_BMI = serializers.SerializerMethodField()
     wallet = WalletSerializer(read_only=True)
+    current_weight = serializers.SerializerMethodField()
     
     class Meta:
         model = Client
@@ -107,17 +148,22 @@ class ClientSerializer(serializers.ModelSerializer):
             'current_BMI',
             'wallet',
             'image_path',
+            'current_weight',
         ]
     
     def get_current_BMI(self, obj):
-        height = obj.height / 100
-        goal = Goal.objects.filter(client=obj.pk,predicted_date__gt=date.today())
-        if goal.exists():
-            weight = goal.latest('predicted_date').weight
-        
-        
-        return weight / height ** 2
+        try:
+            height = obj.height / 100
+            goal = Goal.objects.get(client=obj.pk,status='active')
+            if goal is not None :
+                weight = goal.weight
+            return weight / height ** 2
+        except Goal.DoesNotExist:
+            raise serializers.ValidationError({'error':'please provide weight'})
     
+    def get_current_weight(self,obj):
+        weight = Goal.objects.get(client=obj.pk,status='active').weight
+        return weight
     def create(self, validated_data):
         user_data = validated_data.pop('user_profile', None)
         request = self.context.get('request')
