@@ -1,5 +1,5 @@
 from drf_spectacular.utils import OpenApiExample 
-create_gym_training_plan = [
+create_training_plan = [
     OpenApiExample(
             'Example 1',
             summary='Custom example 1',
@@ -46,7 +46,7 @@ create_gym_training_plan = [
 update_the_training_plan = [
         OpenApiExample
         (
-        'Example',
+        name = 'Example',
             value={
             "notes":"notes",
             "plan_duration_weeks":12
@@ -57,7 +57,7 @@ update_the_training_plan = [
 Exercise_to_workout_plan = [
         OpenApiExample
         (
-        'Example',
+        name = 'Example',
             value={"exercise":95,
                     "sets":2,
                     "reps":{
@@ -85,7 +85,7 @@ update_workout = [
         ]
     ),
     OpenApiExample(
-        'example 2',        
+        name = 'example 2',        
         value=
                 {
                     
@@ -96,5 +96,15 @@ update_workout = [
                             "cardio_duration": None
                     
                 }
+    )
+]
+
+update_the_status = [
+    OpenApiExample(
+        name='example1',
+        value={
+            "is_active": False,
+        }
+
     )
 ]

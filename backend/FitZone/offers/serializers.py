@@ -1,14 +1,21 @@
 from django.db.models import Q
 from rest_framework import serializers 
 from .models import *
-from gym.seriailizers import BranchSerializer
+from gym.seriailizers import BranchSerializer, Registration_FeeSerializer
+from store.serializers import CategorySerializer, Supplements_CategorySerilaizer
+from classes.serializers import Class_ScheduelSerializer
 import datetime
 
 class PercentageOfferSerializer(serializers.ModelSerializer):
     offer_id = serializers.IntegerField(write_only=True)
+    class_data = Class_ScheduelSerializer(source='class_id',read_only=True)
+    fee_data = Registration_FeeSerializer(source ='fee',read_only=True)
+    category_data = CategorySerializer(source ='category',read_only=True)
+    supp_category_data = Supplements_CategorySerilaizer(source='supp_category',read_only=True)
+     
     class Meta:
         model = Percentage_offer
-        fields = [ 'offer_id', 'percentage_cut', 'class_id', 'fee', 'category', 'supp_category']
+        fields = [ 'offer_id', 'percentage_cut', 'class_id', 'fee', 'category', 'supp_category','class_data','fee_data','category_data','supp_category_data']
 
 class ObjectHasPriceOfferSerializer(serializers.ModelSerializer):
     
@@ -35,9 +42,10 @@ class OfferSerializer(serializers.ModelSerializer):
     branch_id = serializers.PrimaryKeyRelatedField(source ='branch',queryset = Branch.objects.all(),write_only=True)
     percentage_offer = PercentageOfferSerializer(source = "percentage_offers", read_only=True)
     price_offer = PriceOfferSerializer(source = "price_offers",read_only=True)
+    offer_id = serializers.PrimaryKeyRelatedField(source='id',read_only=True)
     class Meta:
         model = Offer
-        fields = ['id','start_date','end_date','image_path','branch_id','branch','percentage_offer','price_offer']
+        fields = ['offer_id','start_date','end_date','image_path','branch_id','branch','percentage_offer','price_offer']
         
         def validate(self,data):
 

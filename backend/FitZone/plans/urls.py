@@ -7,4 +7,7 @@ urlpatterns = [
     path('workout/<int:workout_id>/', workoutDetails, name='workoutDetails'),
     path('workout/exercise-create/<int:workout_id>/',workoutExercisesCreate, name='workoutExercisesCreate'),
     path('workout/exercise-update/<int:workout_exercises_id>/',ExerciseWorkoutDetails,name='destoryExerciseWorkout'),
+    path('training/client/<int:client_id>/',clientTrainingPlan, name='clientTrainingPlan'),
+    path('training-details/client/<int:plan_id>/',ClientTrainingPlanDetails,name='ClientTrainingPlanDetails'),
+    path('status/update/<int:client_plan_id>/',planstatus,name='planstatus')
 ]

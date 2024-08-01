@@ -406,13 +406,27 @@ productPriceOfferList = ProdcutPriceOfferListAV.as_view()
                     
 
 
-@extend_schema(
-summary="get specific percentage offer"
-)
 class PercentageOfferDetailsAV(OffersMixin,generics.RetrieveUpdateAPIView):
     serializer_class=OfferSerializer
     queryset = Offer.objects.select_related('percentage_offers').filter(is_deleted=False)
+    
         
+    def get_object(self):
+        try:
+            return Offer.objects.select_related('percentage_offers').get(is_deleted=False, branch=self.kwargs['branch_id'],pk=self.kwargs['pk'],percentage_offers__isnull=False)
+        except Offer.DoesNotExist:
+            raise ValueError('offer does not exist')
+            
+    @extend_schema(
+    summary="get specific percentage offer"
+    )
+    def get(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            serializer =self.get_serializer(instance)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
     @extend_schema(
     summary="update specific percentage offer",
     examples=update_percentage_offer
@@ -420,6 +434,7 @@ class PercentageOfferDetailsAV(OffersMixin,generics.RetrieveUpdateAPIView):
     def put(self, request,pk,branch_id, *args, **kwargs):
         try:
             with transaction.atomic():
+                
                 data = request.data 
                 instance = Percentage_offer.objects.get(offer=pk)
                 offer_detail = data.pop('offer_data',{})
@@ -444,13 +459,20 @@ class PercentageOfferDetailsAV(OffersMixin,generics.RetrieveUpdateAPIView):
 percentageDetails = PercentageOfferDetailsAV.as_view()
 
 
-@extend_schema(
-summary="get specific price offer"
-)
+
 class PriceOfferDetailsAV(OffersMixin,generics.RetrieveUpdateAPIView):
-    queryset = Offer.objects.select_related('price_offers').filter(is_deleted=False)
     serializer_class = OfferSerializer
-        
+    queryset = Offer.objects.select_related('price_offers').filter(is_deleted=False)
+    @extend_schema(
+    summary="get specific price offer"
+    )
+    def get(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            serializer =self.get_serializer(instance)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
     @extend_schema(
     summary="update specific price offer",
     examples=update_price_offers

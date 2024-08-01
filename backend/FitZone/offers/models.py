@@ -23,7 +23,7 @@ class Percentage_offer(models.Model):
     supp_category = models.ForeignKey(Supplements_Category, on_delete=models.CASCADE, related_name="offer", null=True)
     fee = models.ForeignKey(Registration_Fee, on_delete=models.CASCADE, related_name='percentage_offers', null=True)
     class_id = models.ForeignKey(Class_Scheduel, on_delete=models.CASCADE, related_name='percentage_offers', null=True)
-
+ 
 class Price_Offer(models.Model):
     offer = models.OneToOneField(Offer, on_delete=models.CASCADE, related_name='price_offers')
     price = models.PositiveIntegerField(default=0)

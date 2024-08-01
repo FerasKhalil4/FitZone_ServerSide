@@ -25,11 +25,12 @@ class Class_ScheduelSerializer(serializers.ModelSerializer):
         write_only=True)
     class_id = serializers.PrimaryKeyRelatedField(queryset =Classes.objects.filter(is_deleted=False, branch__is_active=True),
                                            write_only=True)
+    class_details = ClassesSerializer(source='class_id',read_only=True)
     
     class Meta:
         model = Class_Scheduel
         fields=['class_id','start_date','end_date','start_time','end_time','trainer','trainer_id','days_of_week'
-                ,'class_scheduel_id','hall','allowed_number_for_class','allowed_days_to_cancel']
+                ,'class_scheduel_id','hall','allowed_number_for_class','allowed_days_to_cancel','class_details']
         
         
     def validate(self, data):
