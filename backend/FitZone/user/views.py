@@ -19,6 +19,7 @@ from wallet.serializers import WalletSerializer
 import datetime
 from django.db.models import Q
 from django.db import transaction
+import json
 
 def Check_points_offer():
     check = Points.objects.get(activity = 'First Time Activity')
@@ -26,6 +27,15 @@ def Check_points_offer():
         return check.points
     return 0
 
+
+def check_validatiy(item):
+    if isinstance(item,str):
+        try:
+            item=json.loads(item)
+        except json.JSONDecodeError:
+            raise ValueError('invalid format')
+        return item
+    
 class RegistrationAV(generics.CreateAPIView):
     serializer_class = ClientSerializer
     queryset = Client.objects.all()
@@ -38,24 +48,33 @@ class RegistrationAV(generics.CreateAPIView):
             with transaction.atomic():
                 data = {}
                 
+                print(request.data.dict())
+                data_ = request.data.dict()
+                data_['user_profile'] = check_validatiy(data_['user_profile'])
+                data_['diseases'] = check_validatiy(data_['diseases'])
+                data_['goal'] = check_validatiy(data_['goal'])
+                
                 check_offers = Check_points_offer()
                 if check_offers != 0:
                     data['points'] = check_offers
+
                     
-                serializer = ClientSerializer(data=request.data,context = {'request':request})
+                serializer = ClientSerializer(data=data_,context = {'request':request})
                 if serializer.is_valid():
                     account = serializer.save()
                     user_profile = serializer.validated_data['user_profile']
                     user_profile.pop('password', None)
                     data['user'] = user_profile
                     
-                    goal = request.data['goal']
+                    print('00000000000000000')
+                    goal = data_['goal']
                     client= account['client']
       
                     goal['client'] = client.pk
                     goal_Serializer = GoalSerializer(data=goal)
                     goal_Serializer.is_valid(raise_exception=True)
                     goal_Serializer.save()
+                    print('00000000000000000')
                     
                     wallet_data={
                         'client':client.pk,
@@ -63,12 +82,12 @@ class RegistrationAV(generics.CreateAPIView):
                     wallet_serializer = WalletSerializer(data=wallet_data)
                     wallet_serializer.is_valid(raise_exception=True)
                     wallet_serializer.save()
-                    diseases = request.data.pop('diseases')
+                    diseases = data_.pop('diseases')
                     if len(diseases) != 0:
                         for disease in diseases:
                             disease_ = {
                                 'client':client.pk,
-                                'disease':disease,
+                                'disease':disease['id'],
                             }
                             serilaizer = Client_DiseaseSerilaizer(data=disease_)
                             serilaizer.is_valid(raise_exception=True)

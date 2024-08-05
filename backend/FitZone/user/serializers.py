@@ -140,7 +140,6 @@ class ClientSerializer(serializers.ModelSerializer):
             'id',
             'user',
             'user_profile',
-            'wakeup_time',
             'address',
             'height',
             'points',
@@ -154,7 +153,8 @@ class ClientSerializer(serializers.ModelSerializer):
     def get_current_BMI(self, obj):
         try:
             height = obj.height / 100
-            goal = Goal.objects.get(client=obj.pk,status='active')
+            goal = Goal.objects.get(client_id=obj.pk,status='Active')
+            print(goal)
             if goal is not None :
                 weight = goal.weight
             return weight / height ** 2
@@ -162,7 +162,7 @@ class ClientSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'error':'please provide weight'})
     
     def get_current_weight(self,obj):
-        weight = Goal.objects.get(client=obj.pk,status='active').weight
+        weight = Goal.objects.get(client=obj.pk,status='Active').weight
         return weight
     def create(self, validated_data):
         user_data = validated_data.pop('user_profile', None)

@@ -22,10 +22,13 @@ class PostListAV(generics.ListCreateAPIView):
     #     gym_id = request.data['gym_id']
     #     query = Q(gym_id=gym_id) | Q(gym__allow_public_posts = True)
     #     posts = Post.objects.filter(query)        
-        
     def post(self, request,gym_id, *args, **kwargs):
+        
         user = request.user
-        data = request.data.copy()
+
+        data = request.data
+        if type(data) is not dict :
+            data = request.data.dict()
         data['gym_id'] = gym_id
         images = request.FILES.getlist('images', [])
         videos = request.FILES.getlist('videos', [])
