@@ -4,6 +4,7 @@ from .serializers import *
 from community.paginations import Pagination
 from django.db import transaction
 from django.db.models import Q
+import json
 
 class ExercisesMixin():
     def exercises_list(self, equipments, trainer=None):
@@ -77,50 +78,58 @@ class EquipmentExerciseListAV(ExercisesMixin,generics.ListCreateAPIView):
         
 equipment_excerciseList = EquipmentExerciseListAV.as_view()
 
+def check_validatiy(item):
+    if isinstance(item,str):
+        try:
+            item=json.loads(item)
+        except json.JSONDecodeError:
+            raise ValueError('invalid format')
+        return item
+
 class EquipmentsListAV(generics.ListCreateAPIView):
     serializer_class = EquipmentSerializer
     queryset = Equipment.objects.all()
     pagination_class = Pagination   
     
     def post(self, request, *args, **kwargs):
-        data = request.data 
-        equipment_data = data.pop('equipment',None)
-        exercise_data = data.pop('exercises',None)
-        diseases = data.pop('diseases',[])
+        data = request.data.dict()
+
+        data['equipment'] = check_validatiy(data.pop('equipment',None))
+        data['exercises'] = check_validatiy(data.pop('exercises',None))
+        data['diseases'] = check_validatiy(data.pop('diseases',[]))
         try:
             with transaction.atomic():
-                equipment_serializer = EquipmentSerializer(data=equipment_data,context = {'request':request})
-                equipment_serializer.is_valid(raise_exception=True)
-                equipment = equipment_serializer.save()
+                data['equipment']['image_path'] = data.pop('image_path',None)
+                serializer = EquipmentSerializer(data=data['equipment'],context = {'request': request})
+                serializer.is_valid(raise_exception=True)
+                equipment = serializer.save()
+                print(equipment)
                 relation_data = {'equipment_id':equipment.pk}
+            
+                video_path = data.pop('video_path', None)
+                if 'exercise_id' not in data:
+                    if request.user.role == 4:
+                        relation_data['trainer']= Trainer.objects.get(employee__user__id = request.user.pk)
+                    exercise_serializer = ExerciseSerializer(data= data['exercises'])
+                    exercise_serializer.is_valid(raise_exception=True)
+                    exercise = exercise_serializer.save()
+                    
+                    relation_data['exercise_id'] =exercise.pk
+                    relation_data['video_path'] = video_path
+                    
+                else:
+                    relation_data['exercise_id'] =exercise.pop('exercise_id', None)
+                    relation_data['video_path'] = video_path 
+                Equipment_Exercise.objects.create(**relation_data)
                 
-                for exercise in exercise_data:         
-                    video_path = exercise.pop('video_path', None)
-                    print(exercise)
-                    if 'exercise_id' not in exercise:
-                        
-                        exercise_serializer = ExerciseSerializer(data=exercise)
-                        exercise_serializer.is_valid(raise_exception=True)
-                        exercise = exercise_serializer.save()
-                        
-                        relation_data['exercise_id'] =exercise.pk
-                        relation_data['video_path'] = video_path
-                        
-                    else:
-                        relation_data['exercise_id'] =exercise.pop('exercise_id', None)
-                        relation_data['video_path'] = video_path 
-                    Equipment_Exercise.objects.create(**relation_data)
-                
-                if len(diseases) != len(set(diseases)):
+                for disease in data['diseases']:
 
-                    return Response({'error':'check on diseases there are duplicate data'},status=status.HTTP_400_BAD_REQUEST)
-                for disease in diseases:
-                    limitation_data = {'disease':disease, 'equipment':equipment.pk}
+                    limitation_data = {'disease':disease['id'], 'equipment':equipment.pk}
                     limitation_serializer = LimitationsSerializer(data=limitation_data)
                     if limitation_serializer.is_valid(raise_exception=True):
                         limitation_serializer.save()
                         print(limitation_serializer.data)
-                return Response({'message':'equipment created Succcefully','data':equipment_serializer.data}, status=status.HTTP_201_CREATED)
+                return Response({'message':'equipment created Succcefully'}, status=status.HTTP_201_CREATED)
             
         except Exception as e:
             raise serializers.ValidationError(str(e))

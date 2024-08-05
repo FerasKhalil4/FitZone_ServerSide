@@ -10,6 +10,7 @@ class Equipment(models.Model):
     description = models.TextField()
     url = models.URLField(blank=True)
     qr_code_image = models.ImageField(upload_to='qr_codes', null=True, blank=True)
+    image_path = models.ImageField(upload_to='image', null=True)
 
     def generate_qr_code(self,data):
         url = data
@@ -44,6 +45,10 @@ class Diagram(models.Model):
     height = models.IntegerField(default=0)
     width = models.IntegerField(default=0)
     
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields=('branch','floor'),name=('branch_floor'))
+        ]
 
 class Diagrams_Equipments(models.Model):
     equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE, related_name="diagrams")
@@ -52,8 +57,12 @@ class Diagrams_Equipments(models.Model):
     x_axis = models.FloatField(default=0.0)
     y_axis = models.FloatField(default=0.0)
     is_deleted = models.BooleanField(default=False)
-
     
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields=('diagram','x_axis','y_axis'),name=('diagram_axises'))
+        ]
+
 class Exercise(models.Model):
     name = models.CharField(max_length=50 , unique=True)
     description = models.TextField(max_length=100)

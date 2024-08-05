@@ -10,7 +10,9 @@ urlpatterns = [
     path('product/<int:pk>/',ProductDetail,name = 'ProductDetail'),
     path('branch/products/<int:pk>/',Branch_productList,name = 'BranchesList'),
     path('product/meals/<int:branch_id>/',mealList,name='mealsList'),
-    path('category/products/<int:category_id>/<int:branch_id>/',CategoryProductsList,name = 'CategoryProducts')
+    path('category/products/<int:category_id>/<int:branch_id>/',CategoryProductsList,name = 'CategoryProducts'),
+    # path('data/',create_.as_view())
     
 ]
 
+ 

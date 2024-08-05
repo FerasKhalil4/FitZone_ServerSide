@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import *
 from equipments.serializers import Equipment_ExerciseSerializer
+from gym.seriailizers import GymSerializer
 import datetime
 
 class Workout_ExercisesSerializer(serializers.ModelSerializer):
@@ -24,28 +25,29 @@ class WorkoutSerializer(serializers.ModelSerializer):
     workout_id = serializers.PrimaryKeyRelatedField(source="id",read_only=True)
     class Meta:
         model = Workout
-        fields = ['workout_id','training_plan','name','exercises','order','is_rest','has_cardio','cardio_duration']
+        fields = ['workout_id','training_plan','name','exercises','order','is_rest','has_cardio','cardio_duration','same_as_order']
                 
 class Gym_plans_ClientsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Gym_plans_Clients
         fields = ['client','gym_training_plan','start_date','end_date','is_active']
         
-class Gym_Training_plansSerializer(serializers.ModelSerializer):
-    clients = Gym_plans_ClientsSerializer(source = "clients.client",read_only=True,many=True)
-    gym_training_id = serializers.PrimaryKeyRelatedField(source="id",read_only=True)
+        
+class TrainingPlanSerializer(serializers.ModelSerializer):
+    workouts = WorkoutSerializer(read_only=True , many=True)
+    plan_id = serializers.PrimaryKeyRelatedField(source="id",read_only=True)
     
     class Meta:
-        model = Gym_Training_plans
-        fields = ['gym_training_id','training_plan','gym','training_plan','clients','plan_duration_weeks']
-        
+        model = Training_plan
+        fields = ['plan_id','notes','workouts']
         
 class ClientTrainingSerializer(serializers.ModelSerializer):
     client_train_plan_id = serializers.PrimaryKeyRelatedField(source="id",read_only=True)
+    training_plan_data = TrainingPlanSerializer(source="training_plan", read_only=True)
     class Meta:
         model = Client_Trianing_Plan
         fields = ['client_train_plan_id','training_plan'
-                  ,'start_date','end_date','trainer','client','is_active','plan_duration_weeks']
+                  ,'start_date','end_date','trainer','client','is_active','plan_duration_weeks','training_plan_data']
     
     def validate_start_date(self,data):
         today = datetime.datetime.now().date()
@@ -53,15 +55,12 @@ class ClientTrainingSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Start date must be greater than today')
         return data
         
-                
-class TrainingPlanSerializer(serializers.ModelSerializer):
-    workouts = WorkoutSerializer(read_only=True , many=True)
-    plan_id = serializers.PrimaryKeyRelatedField(source="id",read_only=True)
-    planGym = Gym_Training_plansSerializer(read_only=True)
-    client_plan = ClientTrainingSerializer(source='TrainersClientsPlans' ,read_only=True)
-    
+
+class Gym_Training_plansSerializer(serializers.ModelSerializer):
+    clients = Gym_plans_ClientsSerializer(source = "clients.client",read_only=True,many=True)
+    gym_training_id = serializers.PrimaryKeyRelatedField(source="id",read_only=True)
+    training_plan_data = TrainingPlanSerializer(source="training_plan",read_only=True)
     class Meta:
-        model = Training_plan
-        fields = ['plan_id','notes','workouts','planGym','client_plan']
-
-
+        model = Gym_Training_plans
+        fields = ['gym_training_id','training_plan','gym','clients','plan_duration_weeks','training_plan_data']
+        

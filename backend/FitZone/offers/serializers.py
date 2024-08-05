@@ -2,12 +2,12 @@ from django.db.models import Q
 from rest_framework import serializers 
 from .models import *
 from gym.seriailizers import BranchSerializer, Registration_FeeSerializer
-from store.serializers import CategorySerializer, Supplements_CategorySerilaizer
+from store.serializers import CategorySerializer, Supplements_CategorySerilaizer,Branch_productSerializer
 from classes.serializers import Class_ScheduelSerializer
 import datetime
 
 class PercentageOfferSerializer(serializers.ModelSerializer):
-    offer_id = serializers.IntegerField(write_only=True)
+    offer_id = serializers.PrimaryKeyRelatedField(source="offer.pk",queryset = Offer.objects.all(),write_only=True)
     class_data = Class_ScheduelSerializer(source='class_id',read_only=True)
     fee_data = Registration_FeeSerializer(source ='fee',read_only=True)
     category_data = CategorySerializer(source ='category',read_only=True)
@@ -18,12 +18,9 @@ class PercentageOfferSerializer(serializers.ModelSerializer):
         fields = [ 'offer_id', 'percentage_cut', 'class_id', 'fee', 'category', 'supp_category','class_data','fee_data','category_data','supp_category_data']
 
 class ObjectHasPriceOfferSerializer(serializers.ModelSerializer):
-    
     class Meta:
         model = ObjectHasPriceOffer
-        fields = ['id','fee','product','number']
-        
-
+        fields = ['id', 'fee', 'product', 'number', 'offer']
         
 class PriceOfferSerializer(serializers.ModelSerializer):
     offer_id = serializers.IntegerField(write_only=True)
@@ -31,9 +28,6 @@ class PriceOfferSerializer(serializers.ModelSerializer):
     class Meta:
         model = Price_Offer
         fields = ['offer_id','price','price_offer_objects']
-        
-
-
         
 class OfferSerializer(serializers.ModelSerializer):
     start_date = serializers.DateField(required=True,input_formats=["%Y-%m-%d"])
@@ -45,7 +39,7 @@ class OfferSerializer(serializers.ModelSerializer):
     offer_id = serializers.PrimaryKeyRelatedField(source='id',read_only=True)
     class Meta:
         model = Offer
-        fields = ['offer_id','start_date','end_date','image_path','branch_id','branch','percentage_offer','price_offer']
+        fields = ['offer_id','start_date','end_date','branch_id','branch','percentage_offer','price_offer']
         
         def validate(self,data):
 

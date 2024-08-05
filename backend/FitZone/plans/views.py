@@ -6,25 +6,23 @@ from trainer.models import Client_Trainer
 from django.db import transaction
 from django.db.models import Q
 from drf_spectacular.utils import  extend_schema
-
+import datetime 
+from django.core.exceptions import ValidationError
 
 class PlanMixin():
     def check_incompatibility(self,data):
-        if (data['has_cardio'] == True and data['cardio_duration'] is None ) or \
-                                (data['has_cardio'] == False and data['cardio_duration'] is not None )\
-                                    or(data['has_cardio'] == True and data['cardio_duration'] is not None and data['name']=='Rest') :
-            raise ValueError('there is uncomapible data for cardio entered')
-        return True
+        if 'has_cardio' in data and 'cardio_duration' and 'name' in data :
+            if (data['has_cardio'] == True and data['cardio_duration'] is None ) or \
+                                    (data['has_cardio'] == False and data['cardio_duration'] is not None )\
+                                        or(data['has_cardio'] == True and data['cardio_duration'] is not None and data['name']=='Rest') :
+                raise ValueError('there is uncomapible data for cardio entered')
+            return True
     def check_order_overlap(self, check_overlap_order ,order):
     
         check_overlap_order.order = order
         check_overlap_order.save()
         return True
     
-    def check_on_workout(self, workouts):
-        if len(workouts) != 7 :
-            raise ValueError('there should be 7 items in workouts')
-        return True
 
     def Create_Training_plan(self,data):
         try:
@@ -35,18 +33,22 @@ class PlanMixin():
         except Exception as e:
             raise ValueError(str(e))
     
+    def check_workout(self,workout):
+        if len(workout) != 7 : 
+            raise ValidationError('wokouts must be 7')
+        return True
     
     def Create_Workouts(self,workouts,plan):
         
         for i in range(len(workouts)):
             if 'name' not in workouts[i]:
                 workouts[i]['name'] = 'Rest'
-                
+        self.check_workout(workouts)
         for workout in workouts:
             exercises = workout.pop('exercises',[])
             workout['training_plan'] = plan.pk
             self.check_incompatibility(workout)
-            
+            print(workout)
             workout_serializer = WorkoutSerializer(data=workout)
             workout_serializer.is_valid(raise_exception=True)
             workout_instance = workout_serializer.save()
@@ -85,11 +87,13 @@ class PlanMixin():
             registration_status='accepted',
             end_date__gte = today
         )
-        check_availability = Client_Trainer.objects.filter(query)  
+        
+        check_availability = Client_Trainer.objects.filter(query) 
+         
         if check_availability.exists():
             return True     
         else:
-            raise LookupError('the client does not available')    
+            raise ValidationError('the client does not available')    
         
     def update_training_plan(self,training_plan_instance,data):
         try:
@@ -132,7 +136,6 @@ class Gym_TrainingPlanCreateAV(PlanMixin,generics.CreateAPIView):
                 data = request.data
                 workouts = data.pop('workouts', [])
                 
-                self.check_on_workout(workouts)
                 plan = self.Create_Training_plan(data)
 
                 gym_plan_data = {
@@ -162,10 +165,11 @@ class Gym_planDetailsAV(PlanMixin,generics.RetrieveUpdateAPIView):
    )
     def get(self, request, *args, **kwargs):
         try:
-            return Response (self.get_training_plan(kwargs.get('plan_id')), status=status.HTTP_200_OK)
+            plan = Gym_Training_plans.objects.get(gym_id =kwargs.get('gym_id'))
+            return Response (Gym_Training_plansSerializer(plan).data, status=status.HTTP_200_OK)
         except Exception as e :
             return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
-    
+     
     @extend_schema(
     summary="update the training plan related to the gym ",
     examples=update_the_training_plan
@@ -327,28 +331,46 @@ class ExerciseWorkoutDetailsAV(generics.RetrieveUpdateDestroyAPIView):
 
 ExerciseWorkoutDetails = ExerciseWorkoutDetailsAV.as_view()    
 
-class ClientTrainingPlanCreateAV(PlanMixin,generics.CreateAPIView):
+class ClientTrainingPlanListAV(PlanMixin,generics.ListCreateAPIView):
     serializer_class = ClientTrainingSerializer
     queryset = Client_Trianing_Plan.objects.all()
     
     @extend_schema(
+        summary='get all training plans related for the requested client',
+    )    
+
+    def get(self, request, *args, **kwargs):
+        try:
+            client = Client.objects.get(user = request.user.pk)
+            gym_plans = Gym_plans_Clients.objects.filter(client = client.pk)
+            training_plans = Client_Trianing_Plan.objects.filter(client = client.pk)
+            gym_plans_serializer = Gym_plans_ClientsSerializer(gym_plans, many=True)
+            training_plans_serializer = ClientTrainingSerializer(training_plans, many=True)
+            return Response({'client_plans':training_plans_serializer.data,
+                            'client_gym_plans':gym_plans_serializer.data,
+                            },status=status.HTTP_200_OK)
+        except Client.DoesNotExist:
+            return Response({'error':'client does not exist'},status=status.HTTP_400_BAD_REQUEST)
+    @extend_schema(
         summary='create training plan for client',
         examples= create_training_plan
     )
+        
     def post(self, request, *args, **kwargs):
         try:
             with transaction.atomic():
                 data = request.data 
                 client = Client.objects.get(pk = kwargs.get('client_id'),user__is_deleted=False)
+                
                 user = request.user
-                trainer = Trainer.objects.get(employee__user=user)   
+                trainer = Trainer.objects.get(employee__user=user)
+                   
                 workouts = data.pop('workouts', [])
                 
-                self.check_client_availabilty(trainer,client )
+                self.check_client_availabilty(trainer,client)
+                                
                 self.check_client_existing_plan(client)
-                self.check_on_workout(workouts)
                 plan = self.Create_Training_plan(data)
-                
                 client_plan_data = {
                     'client':client.pk,
                     'trainer':trainer.pk,                    
@@ -370,23 +392,12 @@ class ClientTrainingPlanCreateAV(PlanMixin,generics.CreateAPIView):
         except Exception as e:
             return Response(str(e),status=status.HTTP_400_BAD_REQUEST)     
          
-clientTrainingPlan= ClientTrainingPlanCreateAV.as_view()
+clientTrainingPlan= ClientTrainingPlanListAV.as_view()
 
 
-class ClientTrainingPlanDetailsAV(PlanMixin,generics.RetrieveUpdateAPIView):
+class ClientTrainingPlanDetailsAV(PlanMixin,generics.UpdateAPIView):
     queryset = Client_Trianing_Plan.objects.all()
     serializer_class = ClientTrainingSerializer
-    @extend_schema(
-        summary="get the training plan related to the client",
-   )
-    def get(self, request, *args, **kwargs):
-        try:
-            data=self.get_training_plan(kwargs.get('plan_id'))
-            return Response (data, status=status.HTTP_200_OK)
-        except Exception as e :
-            return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
-    
-    
     @extend_schema(
     summary="update the training plan related to the client",
     examples=update_the_training_plan

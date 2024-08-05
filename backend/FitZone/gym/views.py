@@ -10,6 +10,7 @@ from .permissions import admin_permissions  , Manager_permissions, admin_manager
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
 from community.paginations import Pagination
+import json
 class GymListCreateAV(generics.ListCreateAPIView):
     serializer_class = GymSerializer
     pagination_class = Pagination
@@ -19,23 +20,28 @@ class GymListCreateAV(generics.ListCreateAPIView):
         return Gym.objects.filter(is_deleted = False).all()    
     @transaction.atomic
     def post (self, request, *args, **kwargs): 
-        registration_fee = request.data.pop('registration_fee') 
-        type_check = {data['type'] for data in registration_fee}
+        data = request.data.dict()
         try:  
-            if len(registration_fee) != len(type_check):
-                return Response({"message":"there is redundant data in the fee data"})
-            gym_serializer = GymSerializer(data =request.data)        
-            if gym_serializer.is_valid(raise_exception=True):
-                gym = gym_serializer.save()
-                fee_details = []
-                for fee in registration_fee :      
-                    fee['gym'] = gym.id
-                    fee_serializer = Registration_FeeSerializer(data=fee)
-                    if fee_serializer.is_valid(raise_exception=True):
-                        fee_serializer.save()
-                        fee_details.append(fee_serializer.data)
-                return Response({'data':gym_serializer.data, 'fee':fee_details},status=status.HTTP_201_CREATED)
-            return Response(gym_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            with transaction.atomic():
+                registration_fee = json.loads(data.pop('registration_fee')) 
+                data['woman_hours'] = json.loads(data.pop('woman_hours'))
+                data['manager_details'] = json.loads(data.pop('manager_details'))
+                data['branch'] = json.loads(data.pop('branch'))
+                print(data)
+                
+                gym_serializer = GymSerializer(data = data)        
+                if gym_serializer.is_valid(raise_exception=True):
+                    gym = gym_serializer.save()
+                    print(gym)
+                    fee_details = []
+                    for fee in registration_fee :       
+                        fee['gym'] = gym.id
+                        fee_serializer = Registration_FeeSerializer(data=fee)
+                        if fee_serializer.is_valid(raise_exception=True):
+                            fee_serializer.save()
+                            fee_details.append(fee_serializer.data)
+                    return Response({'data':gym_serializer.data, 'fee':fee_details},status=status.HTTP_201_CREATED)
+                return Response(gym_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e :
             return Response({'error': str(e)})
         

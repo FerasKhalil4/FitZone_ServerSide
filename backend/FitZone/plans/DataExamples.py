@@ -13,6 +13,7 @@ create_training_plan = [
 			"order":1,
 			"is_rest":False,
 			"has_cardio":False,
+			"cardio_duration":None,
 			"exercises":[
 				{"exercise":95,
 				 "sets":2,
@@ -31,14 +32,25 @@ create_training_plan = [
 				 "rest_time_seconds":120,
 				 "order":2
 				}
+				
 			]
 			
 		} ,
 		{
 			"order":2,
-			"is_rest":True
+			"is_rest":True,
+			"has_cardio":False,
+			"cardio_duration":None
+		},
+		{"order":3,
+			"same_as_order":1
+
 		}
+		
 	]
+	
+	
+	
 }
 
         ),

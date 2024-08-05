@@ -14,6 +14,7 @@ class Classes(models.Model):
         if self.is_deleted!= True:
             self.is_deleted = True
             self.save()
+            
 class Class_Scheduel(models.Model):
     class_id= models.ForeignKey(Classes, on_delete=models.CASCADE, related_name='scheduel')
     start_time = models.TimeField(blank= True)

@@ -1,6 +1,6 @@
 from django.db import models
 from user.models import User
-
+from django.db.models import UniqueConstraint
 
 class Gym(models.Model):
     name = models.CharField(max_length=30 , unique=True)
@@ -27,6 +27,12 @@ class Registration_Fee(models.Model):
     gym = models.ForeignKey(Gym , on_delete=models.CASCADE,related_name="fees" )
     type = models.CharField(max_length=50)
     fee = models.FloatField(default = 0.0)
+    
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields=('gym','type'), name='gym_type'),
+        ]
+    
 class Woman_Training_Hours(models.Model):
     gym = models.ForeignKey(Gym , on_delete=models.CASCADE,related_name="woman_gym" )
     start_hour = models.TimeField()
@@ -56,7 +62,7 @@ class Trainer(models.Model):
     allow_public_posts = models.BooleanField(default=True)
     session_period = models.IntegerField(default=0)
     private_training_price = models.FloatField(default=0.00)
-    online_trainine_price = models.FloatField(default=0.00)
+    online_training_price = models.FloatField(default=0.00)
     
 
     

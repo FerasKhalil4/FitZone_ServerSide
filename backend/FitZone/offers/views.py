@@ -26,7 +26,7 @@ class OffersMixin():
         query = base_query & Q(**{f"percentage_offers__{offer_category}":offer_category_value })
                     
         for key , value in kwargs.items():
-            query &= Q(**{key:value})
+            query &= Q(**{f"percentage_offers__{key}":value})
             
         if offer is not None : 
             check_overlap_offers =Offer.objects.filter(query).exclude(pk = offer.pk)
@@ -92,6 +92,7 @@ class OffersMixin():
         elif 'class_id' in offer_detail:
             check =  self.check_overlapping_offers(start_date, end_date,'class_id', offer_detail['class_id'],branch_id)
         elif 'category' in offer_detail:
+            print(offer_detail)
             if 'supp_category' in offer_detail:
                 check =  self.check_overlapping_offers(start_date, end_date,'category', offer_detail['category'],branch_id,supp_category = offer_detail['supp_category'])
             else:

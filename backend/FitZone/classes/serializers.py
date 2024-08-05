@@ -7,30 +7,17 @@ from django.db.models import Q
 import datetime 
 from django.db.models import Count
 
-class ClassesSerializer(serializers.ModelSerializer):
-    branch = BranchSerializer(read_only=True)
-    branch_id = serializers.IntegerField(write_only=True)    
-    class_id = serializers.PrimaryKeyRelatedField(source='pk',read_only=True)
-    class Meta:
-        model = Classes
-        fields = ['class_id','name','description','registration_fee',
-                'branch','branch_id','image_path','points']
-        
-
 class Class_ScheduelSerializer(serializers.ModelSerializer):
     class_scheduel_id = serializers.PrimaryKeyRelatedField(source = 'id',read_only = True)
     trainer = TrainerSerialzier(read_only=True)
     trainer_id = serializers.PrimaryKeyRelatedField(source = 'trainer',
         queryset=Trainer.objects.filter(employee__user__is_deleted=False),
         write_only=True)
-    class_id = serializers.PrimaryKeyRelatedField(queryset =Classes.objects.filter(is_deleted=False, branch__is_active=True),
-                                           write_only=True)
-    class_details = ClassesSerializer(source='class_id',read_only=True)
-    
+
     class Meta:
         model = Class_Scheduel
-        fields=['class_id','start_date','end_date','start_time','end_time','trainer','trainer_id','days_of_week'
-                ,'class_scheduel_id','hall','allowed_number_for_class','allowed_days_to_cancel','class_details']
+        fields=['start_date','end_date','start_time','end_time','trainer','trainer_id','days_of_week'
+                ,'class_scheduel_id','hall','allowed_number_for_class','allowed_days_to_cancel']
         
         
     def validate(self, data):
@@ -56,11 +43,9 @@ class Class_ScheduelSerializer(serializers.ModelSerializer):
                 if day not in days_of_week.values():
                     raise serializers.ValidationError({"error": "please check on the days entered"})
         
-        def get_gym_details(user):
+        def get_gym_details(branch_id):
             try:
-                employee = Employee.objects.get(user=user)
-                branch = Shifts.objects.filter(employee=employee).first().branch_id
-                gym_id = Branch.objects.get(id=branch).gym_id
+                gym_id = Branch.objects.get(id=branch_id).gym_id
                 return Gym.objects.get(id=gym_id)
             except Exception as e:
                 raise serializers.ValidationError({'error': str(e)})
@@ -140,16 +125,17 @@ class Class_ScheduelSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError('This class overlaps with another one in the same hall and date range.')
 
         days = list(data.get('days_of_week').values())
-        validate_days(days)
-        print(data)
+        
         if data['allowed_number_for_class'] < 0 :
             raise serializers.ValidationError({"error": "please check on the allowed_number_for_class  must be a positive value"})
         
         used_data = get_used_data(data['days_of_week'])
         
         request = self.context.get('request')
+        print('00000000000000000000000000')
         user = request.user
-        gym = get_gym_details(user)        
+        branch_id = self.context.get('branch_id')
+        gym = get_gym_details(branch_id)        
         check_time_validity(gym, data['start_time'], data['end_time'])
         check_date_validity(data['start_date'], data['end_date'])
         check_overlap(data, used_data)
@@ -173,3 +159,23 @@ class ClassClientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Client_Class
         fields = '__all__'
+        
+
+class CreateClassSerializer(serializers.ModelSerializer):
+    schedule = Class_ScheduelSerializer(source='scheduel', many=True)
+
+    class Meta:
+        model = Classes
+        fields = [
+            'name', 'description', 'registration_fee',
+            'image_path', 'points', 'schedule'
+        ]
+
+    def create(self, validated_data):
+        schedule_data = validated_data.pop('scheduel', None)
+        branch_id = self.context.get('branch_id')
+        class_id = Classes.objects.create(branch_id = branch_id , **validated_data)
+        
+        for schedule in schedule_data:
+            Class_Scheduel.objects.create(class_id=class_id, **schedule)
+        return class_id

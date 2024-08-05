@@ -2,8 +2,8 @@ from django.db import models
 from user.models import Client
 from gym.models import Gym, Trainer
 from equipments.models import Equipment_Exercise
-from django.db.models import UniqueConstraint
 from dateutil.relativedelta import relativedelta
+from django.core.exceptions import ValidationError
 
 class Training_plan(models.Model):
     notes = models.TextField(blank=True)
@@ -12,6 +12,11 @@ class Gym_Training_plans(models.Model):
     gym = models.OneToOneField(Gym , on_delete=models.CASCADE,related_name="gymPlans" )
     training_plan = models.OneToOneField(Training_plan, on_delete=models.CASCADE, related_name= "planGym")
     plan_duration_weeks = models.PositiveIntegerField(default=0)
+    
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['training_plan','gym'],name='training_plan_gym')
+        ]
 
 class Gym_plans_Clients(models.Model):
     gym_training_plan = models.ForeignKey(Training_plan, on_delete=models.CASCADE, related_name="clients")
@@ -24,9 +29,7 @@ class Gym_plans_Clients(models.Model):
         if self.start_date:
             self.end_date =  self.start_date + relativedelta(weeks=self.gym_training_plan.plan_duration_weeks)
             self.save()
-        super().save(*args, **kwargs)
-
-            
+        super().save(*args, **kwargs)           
             
     
     
@@ -35,8 +38,32 @@ class Workout(models.Model):
     name = models.CharField(max_length=50,null=True)
     order = models.PositiveIntegerField(default=0)
     is_rest = models.BooleanField(default=False)
-    has_cardio = models.BooleanField(default=True)
+    has_cardio = models.BooleanField(default=False)
     cardio_duration = models.PositiveIntegerField(blank=True,null=True)
+    same_as_order = models.PositiveIntegerField(null=True)
+    
+    def clean(self):
+        super().clean()
+        rest = True
+        if self.is_rest is False and self.same_as_order is not None:
+            rest = None 
+        print(rest)
+        check = sum(attr is not None for attr in [rest, self.same_as_order])
+        if check != 1:
+            raise ValidationError('please either provide the same_as_order or is_rest')
+        if self.is_rest and (self.has_cardio or self.cardio_duration):
+            raise ValidationError('rest workout cannot have cardio or duration')
+    
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+        
+    
+    class Meta:
+        constraints=[
+            models.UniqueConstraint(fields=['training_plan', 'name', 'order'], name='unique_workout_name_order')
+        ]
+    
     
 class Workout_Exercises(models.Model):
     workout = models.ForeignKey(Workout, on_delete=models.CASCADE, related_name="exercises")
@@ -45,7 +72,10 @@ class Workout_Exercises(models.Model):
     reps = models.JSONField(default=dict)
     rest_time_seconds = models.IntegerField(blank=True)
     order = models.PositiveIntegerField(default=0)
-    
+    class Meta:
+        constraints=[
+            models.UniqueConstraint(fields=['workout', 'exercise', 'order'], name='unique_workout_exercise_order')
+        ]
     
 class Client_Trianing_Plan(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="PrivateTrainingPlans")

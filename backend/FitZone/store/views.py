@@ -6,43 +6,52 @@ from .permissions import *
 from points.models import Points
 from .paginations import CustomPagination
 from django.db import transaction
+import json
 import math 
 
-def get_product_points(price):
-    activity = Points.objects.get(activity="Product points percentage").points_percentage
-    return math.ceil(price / activity)
-
-def check_product_data(data):
+class StoreMixin():
     
-        if ('product' in data and 'product_id' in data) :
-            raise serializers.ValidationError({'message':'please provide either the product_id or the product'})
+    def get_product_points(self,price):
+        activity = Points.objects.get(activity="Product points percentage").points_percentage
+        return math.ceil(price / activity)
         
-        if  'product' in data :
-            prdouct_data = data.get('product')
-            product_check = Product.objects.filter(name = prdouct_data['name'], brand = prdouct_data['brand'],category =prdouct_data['category'] )
-            if product_check.exists():
-                raise serializers.ValidationError({'message':'product already exists'})
-            product_serializer = ProductSerializer(data=prdouct_data)
-            if product_serializer.is_valid(raise_exception=True):
-                product = product_serializer.save()
-            product = product.pk
-        elif 'product_id' in data :
-            product = data.get('product_id')
-        else :
-                raise serializers.ValidationError( {'message': 'product_id is required if product is not provided'})
-        
-        return product
-    
-            
-def category_data(serializer_category,product):
-    serializer_category['amount'] = product.amount
-    serializer_category['price'] = product.price
-    serializer_category['image_path'] = product.image_path or None
-    serializer_category['is_available'] = product.is_available
-    serializer_category['branch_product_id'] = product.pk
-    return serializer_category
+                
+    def category_data(self,serializer_category,product):
+        serializer_category['amount'] = product.amount
+        serializer_category['price'] = product.price
+        serializer_category['image_path'] = product.image_path or None
+        serializer_category['is_available'] = product.is_available
+        serializer_category['branch_product_id'] = product.pk
+        return serializer_category
      
+    def create_branch_product(self, details, branch_id, instance, product_type):
+
+        details['branch_id'] = branch_id
+        details['points_gained'] = self.get_product_points(details.get('price'))
+        details['product_id'] = instance.pk
+        details['product_type'] = product_type
+
+        check_data = Branch_products.objects.filter(product_id = instance.pk,
+                                                            branch =branch_id,
+                                                            product_type = 'Meal'
+                                                            )
+        if check_data.exists():
+            return Response({'message':'branch already has this Meal'}, status=status.HTTP_400_BAD_REQUEST)
+        product_serializer =BranchProductCreateSerializer(data=details)
+        product_serializer.is_valid(raise_exception=True)
+        product_serializer.save()
+        print(instance)
+        print(product_serializer.data)
+        return True
     
+    def check_product(self,validated_data):
+        if 'product' in validated_data and 'product_id' in validated_data:
+            raise serializers.ValidationError('Product already in request body')
+        return validated_data
+        
+
+    
+
 class CategoryAV(generics.ListAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
@@ -99,7 +108,7 @@ ProductDetail = ProductDetailsAV.as_view()
 
 
 
-class Branch_productListAV(generics.ListAPIView):
+class Branch_productListAV(StoreMixin,generics.ListAPIView):
     queryset = Branch_products
     serializer_class = Branch_productSerializer
     pagination_class = CustomPagination
@@ -113,36 +122,43 @@ class Branch_productListAV(generics.ListAPIView):
             data_ = []
             
             for data in page:
+                print(data.product_type)
                 if data.product_type== 'Supplement':
                     supplement_ = Supplements.objects.get(id = data.product_id)
                     serializer = SupplementsSerializer(supplement_).data
+                    branch_data = serializer.data
                     branch_data['branch_product_id'] = pk
+                    if branch_data['image_path'] is not None:
+                        branch_data['image_path'] = branch_data['image_path'].url
                     
-                    branch_data = category_data(branch_data , data)
+                    branch_data = self.category_data(branch_data , data)
                     data_.append(branch_data)
                     
                 elif data.product_type=='Accessory':
-                    
+                    print(data.image_path)
                     accessory = Accessories.objects.get(id = data.product_id)
                     serializer = AccessoriesSerializer(accessory)
                     branch_data = serializer.data
                     branch_data['branch_product_id'] = pk
                     
-                    branch_data = category_data(branch_data , data)
+                    branch_data = self.category_data(branch_data , data)
+                    if branch_data['image_path'] is not None:
+                        branch_data['image_path'] = branch_data['image_path'].url
                     data_.append(branch_data)
+                    return paginator.get_paginated_response(data_)        
                     
                 elif data.product_type=='Meal':
-                    
-                    meal = Meals.objects.get(id = data.product_id)
+                    print(data.image_path)
+                    meal = Meals.objects.get(id = data.product_id) 
                     serializer = MealsSerializer(meal)
                     branch_data = serializer.data
                     branch_data['branch_product_id'] = pk
 
                     
-                    
-                    branch_data = category_data(branch_data , data)
-                    data_.append(branch_data)                    
-
+                    branch_data = self.category_data(branch_data , data)
+                    if branch_data['image_path'] is not None:
+                        branch_data['image_path'] = branch_data['image_path'].url
+                    data_.append(branch_data)  
             return paginator.get_paginated_response(data_)        
         except Exception as e: 
             return Response({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -150,120 +166,85 @@ Branch_productList = Branch_productListAV.as_view()
 
 
 
-class AccessoriesListAV(generics.ListCreateAPIView):
+class AccessoriesListAV(StoreMixin,generics.ListCreateAPIView):
     queryset = Accessories.objects.all()
     serializer_class =AccessoriesSerializer
-    #get all the accessories of the product for the creation process
     
     def post(self, request,branch_id, *args, **kwargs):
         try:
             with transaction.atomic():
-                data = request.data
-                product = check_product_data(data)
-                details_data = data.get('details')
-                detailed_data = []
-                check_redundency = []
-                for color, details in details_data.items():
-                    for detail in details:
-                        
-                        detail['branch_id'] = branch_id
-                        detail['price']=data.get('price')
-                        detail['points_gained'] =  get_product_points(data.get('price'))
-                        detail['image_path'] = data.get('image_path')    
-                                        
-                        check_redundency.append((color,detail['amount'],detail['size']))
-                        
-
-                        
-                        check = Accessories.objects.filter(product = product, size=detail['size'],color=color).first()
-                        if check is not None :
-                            accessory_instnace = check
-                            check_data = Branch_products.objects.filter(product_id = accessory_instnace.pk,
-                                                branch = branch_id,
-                                                product_type = 'Accessory'
-                                                )
-                            if check_data.exists():
-                                return Response({'message':'branch already has this accessory'}, status=status.HTTP_400_BAD_REQUEST)
-                        else:
-                            accessory_detail = {}
-                            
-                            accessory_detail ['color'] = color           
-                            accessory_detail['size'] = detail.pop('size')    
-                            accessory_detail['product_id'] = product 
-                            
-                            accessorySerializer = self.get_serializer(data=accessory_detail)  
-                            accessorySerializer.is_valid(raise_exception=True)
-                            accessory_instnace = accessorySerializer.save()                  
-                            
-                        detail['product_branch_id'] = accessory_instnace.pk
-                        detail ['product_type'] = 'Accessory'
-                        productBranch_serializer = Branch_productSerializer(data=detail)
-                        productBranch_serializer.is_valid(raise_exception=True)
-                        productBranch_serializer.save()
-                        
-                        detailed_data.append(productBranch_serializer.data)
-                        
-                if len(check_redundency) != len(set(check_redundency)):
-                    return Response({'message':'check on the accessory attributes there is redudant data'}, status = status.HTTP_400_BAD_REQUEST)
+                image = request.FILES.get('image_path',None)
                 
-                return Response({"message":"product Created successfully",
-                                    "product_data":detailed_data
-                                    },status=status.HTTP_201_CREATED
-                                )
+                data = request.data.dict()
+                self.check_product(data)
+                if 'product_id' in data :
+                    data.pop('image_path',None)
+                if isinstance(data.get('product'), str):
+                    data['product'] = json.loads(data['product'])
+                if isinstance(data.get('accessory'), str):
+                    data['accessory'] = json.loads(data['accessory'])
+                    
+                serializer = AccessoryRequestSerializer(data=data)
+                serializer.is_valid(raise_exception=True)
+                accessory_instances = serializer.save()
+                
+                if isinstance(data['details'], str):
+                    details = json.loads(data['details'])
+                if image is not None:
+                    details['image_path'] = image
+                
+                for instance in accessory_instances:
+                    for item in data['accessory']:
+                        print(item)
+                        if item['color'] == instance.color and item['size'] == instance.size:
+                            details['amount'] = item['amount']
+                            self.create_branch_product(details, branch_id, instance, 'Accessory')
+                
+                                    
+
+            return Response({"message": "Accessories processed successfully."}, status=status.HTTP_201_CREATED)
+
         except Exception as e:
-            raise serializers.ValidationError(str(e))
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
     
 AcccessoriesList = AccessoriesListAV.as_view()
 
 
-class SupplementsListAV(generics.ListCreateAPIView):
+class SupplementsListAV(StoreMixin,generics.ListCreateAPIView):
     
     queryset = Supplements.objects.all()
     serializer_class = SupplementsSerializer
     
     def post(self, request,branch_id, *args, **kwargs):
         try:
+            # check(data,image = image) 
             with transaction.atomic():
-                data = request.data 
-                product = check_product_data(data)
-                details_data = data.get('details')
-                details_data['branch_id'] = branch_id
-                details_data['points_gained'] =  get_product_points(details_data.get('price'))
-                details_data['image_path'] = data.get('image_path') 
-                supplement_details = data.get('supp_data')
+                image = request.FILES.get('image_path',None)
+                data = request.data.dict()
                 
-                # check_product_branch = check_redudncy_branch_product(product,data.get('branch_id'))
-                check = Supplements.objects.filter(product = product, weight = supplement_details.get('weight'),flavor=supplement_details.get('flavor')).first()
-                print(check)            
-                if check is not None:
-                    supplement_insntance = check
+                self.check_product(data)
+                
+                if 'product_id'  in data :
+                    data.pop('image_path',None)
+                
+                if isinstance(data.get('product'), str):
+                    data['product'] = json.loads(data['product'])
+                if isinstance(data.get('supplements'), str):
+                    data['supplements'] = json.loads(data['supplements'])
                     
+                serializer = SupplementsRequestSerializer(data=data)
+                serializer.is_valid(raise_exception=True)
+                supplement_instance = serializer.save() 
                 
-                else:
-                    print('0000000000000')
-                    supplement_details['product_id'] = product
-                    supplement_details['supplement_category_id'] = supplement_details.pop('supplement_category_id', None)
-
-                    supplementSerializer = self.get_serializer(data=supplement_details)  
-                    supplementSerializer.is_valid(raise_exception=True)
-                    supplement_insntance = supplementSerializer.save()
+                if isinstance(data['details'], str):
+                    details = json.loads(data['details'])
+                if image is not None:
+                    details['image_path'] = image
                     
-                check_data = Branch_products.objects.filter(product_id = supplement_insntance.pk,
-                                                                branch = branch_id,
-                                                                product_type = 'Supplement'
-                                                                )
+                self.create_branch_product(details, branch_id, supplement_instance, 'Supplement')
                 
-                if check_data.exists():
-                    return Response({'message':'branch already has this Supplement'}, status=status.HTTP_400_BAD_REQUEST)
-
-                details_data['product_branch_id'] = supplement_insntance.pk
-                details_data ['product_type'] = 'Supplement'
-                productBranch_serializer = Branch_productSerializer(data=details_data)
-                productBranch_serializer.is_valid(raise_exception=True)
-                productBranch_serializer.save()
-                return Response({"message":"product Created successfully",
-                                    "product_data":productBranch_serializer.data,
-                                    "supp_data":SupplementsSerializer(supplement_insntance).data
+                return Response({"message":"product Created successfully"
                                     },status=status.HTTP_201_CREATED
                                 )
         except Exception as e:
@@ -271,52 +252,44 @@ class SupplementsListAV(generics.ListCreateAPIView):
 
 supplemetsList = SupplementsListAV.as_view()
 
-class MealListAV(generics.ListCreateAPIView):
+
+class MealListAV(StoreMixin,generics.ListCreateAPIView):
     queryset = Meals.objects.all()
     serializer_class = MealsSerializer
-    def post(self, request,branch_id,*args, **kwargs):
+
+    def post(self, request, branch_id, *args, **kwargs):
         try:
             with transaction.atomic():
-                data = request.data 
-                product = check_product_data(data)
-                details = data.get('details',{})
-                details['branch_id'] =branch_id
-                details['points_gained'] =  get_product_points(details.get('price'))
-                details['image_path'] = data.get('image_path')  
+                image = request.FILES.get('image_path',None)
+                data = request.data.dict()
                 
+                if 'product_id'  in data :
+                    data.pop('image_path',None)
                 
-                meals = data.get('meals',{})
-                meals['product_id'] = product
-                
-                mealSerializer = MealsSerializer(data=meals)
-                mealSerializer.is_valid(raise_exception=True)
-                meal_instance = mealSerializer.save()
-                check_data = Branch_products.objects.filter(product_id = meal_instance.pk,
-                                                                    branch =branch_id,
-                                                                    product_type = 'Meal'
-                                                                    )
-                if check_data.exists():
-                    return Response({'message':'branch already has this Meal'}, status=status.HTTP_400_BAD_REQUEST)
+                if isinstance(data.get('product'), str):
+                    data['product'] = json.loads(data['product'])
+                if isinstance(data.get('meals'), str):
+                    data['meals'] = json.loads(data['meals'])
                     
+                serializer = MealRequestSerializer(data=data)
+                serializer.is_valid(raise_exception=True)
+                meal_instance = serializer.save()
                 
-                details['product_branch_id'] = meal_instance.pk
-                details['product_type'] = "Meal"
-                productBranch_serializer = Branch_productSerializer(data=details)
-                productBranch_serializer.is_valid(raise_exception=True)
-                productBranch_serializer.save()
-                return Response({"message":"product Created successfully",
-                                    "product_data":productBranch_serializer.data,
-                                    "supp_data":mealSerializer.data
-                                    },status=status.HTTP_201_CREATED
-                                )
-        except Exception as e :
-            return Response({"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
-    
+                if isinstance(data['details'], str):
+                    details = json.loads(data['details'])
+                if image is not None:
+                    details['image_path'] = image
+                    
+                self.create_branch_product(details, branch_id, meal_instance, 'Meal')
+                
+                return Response({"message": "Product created successfully"}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 mealList = MealListAV.as_view()
-            
 
         
-class CategoryProductsListAV(generics.ListAPIView):
+class CategoryProductsListAV(StoreMixin,generics.ListAPIView):
     serializer_class = Branch_productSerializer
     queryset = Branch_products.objects.all()
     pagination_class = CustomPagination
@@ -332,7 +305,7 @@ class CategoryProductsListAV(generics.ListAPIView):
                 for product in page:
                     supplemetns = Supplements.objects.get(pk=product.product_id)
                     serializer_category = SupplementsSerializer(supplemetns).data     
-                    serializer_category = category_data(serializer_category , product)
+                    serializer_category = self.category_data(serializer_category , product)
                     print(serializer_category)
                     
                     data_retrieved.append(serializer_category)
@@ -341,7 +314,7 @@ class CategoryProductsListAV(generics.ListAPIView):
                 for product in page:
                     accessories = Accessories.objects.get(pk=product.product_id)
                     serializer_category = AccessoriesSerializer(accessories).data
-                    serializer_category = category_data(serializer_category , product)
+                    serializer_category = self.category_data(serializer_category , product)
                     data_retrieved.append(serializer_category)
                     
                 return paginator.get_paginated_response(data_retrieved)
@@ -349,7 +322,7 @@ class CategoryProductsListAV(generics.ListAPIView):
                 for product in page:
                     meals = Meals.objects.get(pk=product.product_id)
                     serializer_category = MealsSerializer(meals).data
-                    serializer_category = category_data(serializer_category , product)
+                    serializer_category = self.category_data(serializer_category , product)
                     data_retrieved.append(serializer_category)
                 return paginator.get_paginated_response(data_retrieved)
             
@@ -369,3 +342,10 @@ class CategoryProductsListAV(generics.ListAPIView):
             return Response({"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
     
 CategoryProductsList = CategoryProductsListAV.as_view()
+
+
+""""Male: 9.99 x weight + 6.25 x height – 4.92 x age + 5
+Female: 9.99 x weight + 6.25 x height – 4.92 x age – 161
+According to the ACE, the Mifflin-St Jeor equation is more accurate than the Revised Harris-Benedict BMR equation.
+
+Other options"""

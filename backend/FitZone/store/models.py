@@ -1,6 +1,6 @@
 from django.db import models
 from gym.models import Branch
-
+from django.db.models import UniqueConstraint
 class Category(models.Model):    
     
     name = models.CharField(max_length=50 , unique = True )
@@ -14,7 +14,11 @@ class Product(models.Model):
     is_deleted = models.BooleanField(default=False)
     brand = models.CharField(max_length=50, null=True)
     image_path = models.ImageField(upload_to='images/',null=True)
-
+    
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields=('name','brand','category'), name='brand_category_name_constraint'),
+        ]
 class Supplements_Category(models.Model):
     
     name = models.CharField(max_length=50)
@@ -27,9 +31,13 @@ class Accessories (models.Model):
     color = models.CharField(max_length=50, null=True)
     size = models.CharField(max_length=50,null=True)
     
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields=('product','color','size'), name='product_color_size'),
+        ]
 class Meals(models.Model):
     
-    product = models.ForeignKey(Product , on_delete = models.CASCADE , related_name="meals")
+    product = models.OneToOneField(Product , on_delete = models.CASCADE , related_name="meals")
     protein = models.FloatField(default=0.0,null=True)
     carbs = models.FloatField(default=0.0,null=True)
     calories = models.FloatField(default=0.0,null=True)
@@ -49,6 +57,12 @@ class Supplements(models.Model):
     weight = models.FloatField(default=0.0,null=True)
     flavor = models.CharField(blank=True, max_length=50)
     
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields=('product','weight','flavor'), name='product_weight_flavor'),
+        ]
+    
+    
 class Branch_products(models.Model):
     
     branch = models.ForeignKey(Branch , on_delete= models.CASCADE,related_name="product")
@@ -59,5 +73,9 @@ class Branch_products(models.Model):
     price = models.FloatField(default=0.0)
     points_gained = models.IntegerField(default=0)
     image_path = models.ImageField(upload_to='images/' , null = True)
-
+    
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields=('branch','product_id','product_type'), name='branch_product_constraint'),
+        ]
     

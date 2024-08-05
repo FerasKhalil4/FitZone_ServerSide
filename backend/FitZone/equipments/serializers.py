@@ -2,7 +2,8 @@ from rest_framework import serializers
 from .models import *
 from django.contrib.sites.shortcuts import get_current_site
 from django.urls import reverse        
-from disease.serializers import LimitationsSerializer
+from disease.serializers import LimitationsSerializer,DiseaseSerializer
+
 
 class ExerciseSerializer(serializers.ModelSerializer):
     exercise_id = serializers.PrimaryKeyRelatedField(source='id',read_only=True)
@@ -26,7 +27,7 @@ class EquipmentSerializer(serializers.ModelSerializer):
     excerises = ExerciseSerializer(source = 'Equipment_Exercise.exercise',read_only=True,many = True)
     class Meta:
         model = Equipment
-        fields = ['equipment_id','name', 'description', 'url', 'qr_code_image','exercise','limitations','excerises']
+        fields = ['equipment_id','name', 'description', 'url', 'qr_code_image','exercise','limitations','excerises','image_path']
     
     def create(self,validated_data):
         request = self.context.get('request')
@@ -82,3 +83,16 @@ class DiagramSerialzier(serializers.ModelSerializer):
             return Diagrams_EquipmentsSerializer(equipments,many=True).data
         except Exception as e:
             raise serializers.ValidationError(str(e))
+        
+
+class CreateEquipment(serializers.ModelSerializer):
+    equipment = EquipmentSerializer()
+    diseases = LimitationsSerializer(required=False,many=True)
+    exercises = ExerciseSerializer()
+    
+    class Meta:
+        model = Equipment
+        fields = ['equipment','diseases','exercises']
+    
+    def create(self, validated_data):
+        print(validated_data)

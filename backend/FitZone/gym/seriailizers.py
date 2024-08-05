@@ -219,4 +219,4 @@ class TrainerSerialzier(serializers.ModelSerializer):
     employee = EmployeeSerializer(read_only=True)
     class Meta:
         model = Trainer 
-        fields= ['id','employee','employee_id','num_of_trainees','allow_public_posts','session_period','online_trainine_price','private_training_price']
+        fields= ['id','employee','employee_id','num_of_trainees','allow_public_posts','session_period','online_training_price','private_training_price']

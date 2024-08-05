@@ -5,6 +5,7 @@ from .serializers import *
 from points.models import Points
 import math, datetime
 from django.db import transaction
+import json
 def get_product_points(price):
     activity = Points.objects.get(activity="Product points percentage").points_percentage
     return math.ceil(price / activity)
@@ -25,33 +26,27 @@ class ClassesListAV(generics.ListCreateAPIView):
     
     
     def post(self, request,branch_id, *args, **kwargs):
-        try:
-            with transaction.atomic():
-                data = request.data
-                schedule_data = data.get('schedule',[])
-                print(data['registration_fee'])
-                data['points'] = get_product_points(data['registration_fee'])
-                data['branch_id'] = branch_id
+            try:
+                with transaction.atomic():
+                        data = request.data.dict()
+                        schedule_data = request.data.get('schedule')
+                        if schedule_data:
+                            if isinstance(schedule_data, str):
+                                try:
+                                    schedule_data = json.loads(schedule_data.replace("'", "\""))
+                                except json.JSONDecodeError:
+                                    return Response({"error": "Invalid format for schedule"}, status=status.HTTP_400_BAD_REQUEST)
+                        
+                        data['schedule'] = schedule_data
+                        serializer = CreateClassSerializer(data=data,context = {'request':request,'branch_id':branch_id})
+                        if serializer.is_valid(raise_exception=True):
+                            serializer.save()
+                            
+                return Response({'message':'class created successfully'}, status=status.HTTP_201_CREATED)
+                            
+            except Exception as e:
+                return Response(str(e),status=status.HTTP_400_BAD_REQUEST)
                 
-                serializer = ClassesSerializer(data=request.data)
-                serializer.is_valid(raise_exception=True)
-                class_instance = serializer.save()
-                schedule_data_retrieve= []
-                
-                for schedule in schedule_data :
-                    
-                    schedule['class_id'] = class_instance.pk
-                    schedule_serializer = Class_ScheduelSerializer(data=schedule, context = {'request':request})
-                    schedule_serializer.is_valid(raise_exception=True)
-                    schedule_serializer.save()
-                    schedule_data_retrieve.append(schedule_serializer.data)
-                
-                return Response({'message':'class created successfully',
-                                'class_data':serializer.data,
-                                'class_scheduel':schedule_data_retrieve,                             
-                                }, status=status.HTTP_201_CREATED)
-        except Exception as e:
-            return Response({'error': str(e)})
 classesListAV = ClassesListAV.as_view()
     
 class ClassesDetailAV(generics.RetrieveUpdateDestroyAPIView):
@@ -60,11 +55,15 @@ class ClassesDetailAV(generics.RetrieveUpdateDestroyAPIView):
     
     
     def update(self,request, pk, *args , **kwargs):
-        class_data = Classes.objects.get(pk = pk)
-        serializer = self.get_serializer(class_data, data = request.data ,context = {'request': request, 'instance':class_data})
-        if serializer.is_valid(raise_exception=True):
-            serializer.save()
-        return Response(serializer.data)
+        try:
+                class_data = Classes.objects.get(pk = pk)
+                serializer = self.get_serializer(class_data, data = request.data ,context = {'request': request,
+                                                                                            'instance':class_data},partial=True)
+                if serializer.is_valid(raise_exception=True):
+                    serializer.save()
+                return Response({'success':'class updated successfully'},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
         
     def destroy(self,request, pk, *args , **kwargs):
         try:
