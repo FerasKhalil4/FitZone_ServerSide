@@ -1,6 +1,9 @@
 from django.db import models
 from user.models import User
 from django.db.models import UniqueConstraint
+import qrcode
+from io import BytesIO
+from django.core.files.base import ContentFile
 
 class Gym(models.Model):
     name = models.CharField(max_length=30 , unique=True)
@@ -20,6 +23,7 @@ class Gym(models.Model):
     allowed_days_for_registraiton_cancellation = models.IntegerField(default=0)
     number_of_clients_allowed = models.IntegerField(default=0)
     current_number_of_clients= models.IntegerField(default=0)
+
     def __str__(self) -> str:
         return f"{self.id}:{self.name}"
     
@@ -46,6 +50,33 @@ class Branch(models.Model):
     street = models.CharField(max_length=50,blank = True)
     has_store = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    url = models.URLField(blank=True)
+    qr_code_image = models.ImageField(upload_to='qr_codes', null=True, blank=True)
+    
+    def generate_qr_code(self,data):
+        url = data
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(url)
+        qr.make(fit=True)
+
+        image = qr.make_image(fill_color="black", back_color="white")
+
+        qr_file = BytesIO()
+        image.save(qr_file, format="PNG")
+
+        file_name = f"{self.gym.name.replace(' ', '_')}.png"
+        self.qr_code_image.save(file_name, ContentFile(qr_file.getvalue()), save=False)
+
+
+    def save(self, *args, **kwargs):
+        if self.url:
+            self.generate_qr_code(self.url)
+        super().save(*args, **kwargs)
     
     def delete(self , *args , **kwargs):
         if self:
@@ -58,9 +89,7 @@ class Employee(models.Model):
 
 class Trainer(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="trainer")
-    num_of_trainees = models.IntegerField(default=0)
     allow_public_posts = models.BooleanField(default=True)
-    session_period = models.IntegerField(default=0)
     private_training_price = models.FloatField(default=0.00)
     online_training_price = models.FloatField(default=0.00)
     

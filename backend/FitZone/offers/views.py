@@ -5,6 +5,7 @@ from .DataExamples import *
 from community.paginations import Pagination
 from django.db import transaction
 from drf_spectacular.utils import extend_schema
+from django.core.exceptions import ValidationError
 
 class OffersMixin():
     
@@ -90,19 +91,36 @@ class OffersMixin():
                 check = self.check_overlapping_offers(start_date, end_date,'fee', offer_detail['fee'],branch_id)
             check = self.check_overlapping_offers(start_date, end_date,'fee',offer_detail['fee'],branch_id)
         elif 'class_id' in offer_detail:
-            check =  self.check_overlapping_offers(start_date, end_date,'class_id', offer_detail['class_id'],branch_id)
+            try:
+                check =  self.check_overlapping_offers(start_date, end_date,'class_id', offer_detail['class_id'],branch_id)
+            except Class_Scheduel.DoesNotExist:
+                raise ValidationError({'error':'check on the class instance schdule'})
+
         elif 'category' in offer_detail:
             print(offer_detail)
             if 'supp_category' in offer_detail:
-                check =  self.check_overlapping_offers(start_date, end_date,'category', offer_detail['category'],branch_id,supp_category = offer_detail['supp_category'])
+                check = self.check_overlapping_offers(start_date, end_date,'category', offer_detail['category'],branch_id,supp_category = offer_detail['supp_category'])
             else:
-                check =  self.check_overlapping_offers(start_date, end_date,'category', offer_detail['category'],branch_id)
+                check = self.check_overlapping_offers(start_date, end_date,'category', offer_detail['category'],branch_id)
         elif 'objects_data' in offer_detail:
             check =  self.check_overlapping_price_offers(start_date,end_date,'product',None,branch_id,offer = offer, product_data = offer_detail['objects_data'])
         return check
                 
-            
+    def check_date(self,data) -> None:
+        query = Q(
+            start_date__lte = data['start_date'],
+            end_date__gte = data['end_date'],
+            class_id = data['offer_data']['class_id']
+        )
+        check = Class_Scheduel.objects.filter(query)
+        print(check)
+        if check.exists():
+            pass
+        else:
+            raise ValidationError('check on the class schdeule')
         
+
+          
     def SerializingCreatingPercentageOffers(self,data):
         try:
             offer_data = data.pop('offer_data', {})
@@ -115,6 +133,7 @@ class OffersMixin():
             offer_data['offer_id'] = offer.pk
             percentage_serialzier = PercentageOfferSerializer(data=offer_data)
             percentage_serialzier.is_valid(raise_exception=True)
+
             percentage_serialzier.save()
             
             return percentage_serialzier.data
@@ -304,7 +323,8 @@ class ClassPercentageOfferListAV(OffersMixin, generics.ListCreateAPIView):
                 if 'class_id' not in data['offer_data']:
                     return Response({'message': 'No classes sent'}, status = status.HTTP_400_BAD_REQUEST)
                 try:
-                    Class_Scheduel.objects.filter(id = data['offer_data']['class_id'], class_id__branch_id = branch_id)
+                    instance = Class_Scheduel.objects.get(id = data['offer_data']['class_id'],
+                                                           class_id__branch_id = branch_id, start_date__lte = start_date, end_date__gte=end_date)
                 except Class_Scheduel.DoesNotExist:
                     return Response({'error':'Class instance doesnot exist'},status=status.HTTP_400_BAD_REQUEST)
                 
@@ -313,7 +333,7 @@ class ClassPercentageOfferListAV(OffersMixin, generics.ListCreateAPIView):
                 offer = self.SerializingCreatingPercentageOffers(data)
                 return Response({'message':'offer created successfully','offer': offer}, status = status.HTTP_201_CREATED)
         except Exception as e:
-            return Response ({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response ({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)  
 
 classPercentageList = ClassPercentageOfferListAV.as_view()
 
@@ -437,13 +457,15 @@ class PercentageOfferDetailsAV(OffersMixin,generics.RetrieveUpdateAPIView):
             with transaction.atomic():
                 
                 data = request.data 
+                if 'class_id' in data['offer_data']:
+                    print('check')
+                    self.check_date(data)
                 instance = Percentage_offer.objects.get(offer=pk)
                 offer_detail = data.pop('offer_data',{})
                 start_date = data['start_date']
-                end_date = data['end_date']    
-                
+                end_date = data['end_date'] 
+                   
                 self.update_Offer(offer_detail,start_date,end_date,branch_id,offer_type='percentageOffer')
-                
                 offer_serializer = OfferSerializer(instance, data=data, partial = True)
                 offer_serializer.is_valid(raise_exception=True)
                 offer_serializer.save()

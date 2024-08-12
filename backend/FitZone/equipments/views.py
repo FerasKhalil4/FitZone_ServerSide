@@ -103,13 +103,10 @@ class EquipmentsListAV(generics.ListCreateAPIView):
                 serializer = EquipmentSerializer(data=data['equipment'],context = {'request': request})
                 serializer.is_valid(raise_exception=True)
                 equipment = serializer.save()
-                print(equipment)
                 relation_data = {'equipment_id':equipment.pk}
             
                 video_path = data.pop('video_path', None)
                 if 'exercise_id' not in data:
-                    if request.user.role == 4:
-                        relation_data['trainer']= Trainer.objects.get(employee__user__id = request.user.pk)
                     exercise_serializer = ExerciseSerializer(data= data['exercises'])
                     exercise_serializer.is_valid(raise_exception=True)
                     exercise = exercise_serializer.save()
@@ -118,7 +115,7 @@ class EquipmentsListAV(generics.ListCreateAPIView):
                     relation_data['video_path'] = video_path
                     
                 else:
-                    relation_data['exercise_id'] =exercise.pop('exercise_id', None)
+                    relation_data['exercise_id'] =data.pop('exercise_id', None)
                     relation_data['video_path'] = video_path 
                 Equipment_Exercise.objects.create(**relation_data)
                 

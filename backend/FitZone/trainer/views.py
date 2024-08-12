@@ -72,7 +72,7 @@ class ApproveClientsAV(generics.RetrieveUpdateAPIView):
                 if data['registration_status'] != 'rejected':
                     start_date = datetime.datetime.now().date()
                     end_date = start_date + relativedelta(months=1)
-                    data['start_date'] = start_date
+                    data['start_date'] = start_date 
                     data['end_date'] = end_date
                 serializer = self.get_serializer(instance, data=data, partial=True)
                 serializer.is_valid(raise_exception=True)
@@ -127,3 +127,75 @@ class ClientPlanRetrieveAV(generics.RetrieveAPIView):
             return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
 
 ClientTrainingPlanRetrieve = ClientPlanRetrieveAV.as_view()
+
+
+class TrainerGroupsListAV(generics.ListCreateAPIView):
+    serializer_class = TrainerGroupsSerializer
+    queryset = TrainerGroups.objects.all()
+    
+    @extend_schema(
+        summary='get trainer groups',
+    )
+    def get(self, request, *args, **kwargs): 
+        return super().get(request, *args, **kwargs)
+        
+    @extend_schema(
+        summary='create a group',
+        examples=group
+    )
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        try:
+            with transaction.atomic():
+                trainer = Trainer.objects.get(employee__user=request.user)
+                data['trainer'] = trainer.id
+                session_length = data.pop('session_length')
+                data['end_hour'] =datetime.datetime.strftime(datetime.datetime.strptime(data['start_hour'],'%H:%M:%S') 
+                                                             + datetime.timedelta(minutes=session_length),'%H:%M:%S' )
+                serializer = self.get_serializer(data=data)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+                return Response({'success':'group is created successfully'}, status=status.HTTP_201_CREATED)
+        except Exception as e: 
+            return Response({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+trainerGroupsList = TrainerGroupsListAV.as_view()
+
+class TrainerGroupsDetailAV(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = TrainerGroupsSerializer
+    queryset = TrainerGroups.objects.all()
+    @extend_schema(
+        summary='get a group',
+    )
+    
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+    
+    @extend_schema(
+        summary='get a group',
+        examples=group
+    )
+    def put(self, request, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                instance = self.get_object()
+                data = request.data
+                trainer = Trainer.objects.get(employee__user=request.user)
+                data['trainer'] = trainer.id
+                session_length = data.pop('session_length')
+                data['end_hour'] =datetime.datetime.strftime(datetime.datetime.strptime(data['start_hour'],'%H:%M:%S') 
+                                                                + datetime.timedelta(minutes=session_length),'%H:%M:%S' )
+                serializer = self.get_serializer(instance, data=data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+                return Response({'success':'group updated successfully'}, status =status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @extend_schema(
+        summary='delete a group',
+    )
+    def delete(self, request, *args, **kwargs):
+        return super().delete(request, *args, **kwargs)
+        
+TrainerGroupsDetail = TrainerGroupsDetailAV.as_view()

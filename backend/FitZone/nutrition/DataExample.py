@@ -6,10 +6,6 @@ plan_create = [
             
 	
 	"name":"calorie deficit",
-	"protein_required":200,
-	"carbs_required":250,
-	"fats_required":200,
-	"calories_required":2500,
 	"weeks_number":10,
 	"notes":"lose weight",
 	"is_same":False,

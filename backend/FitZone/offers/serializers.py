@@ -12,10 +12,16 @@ class PercentageOfferSerializer(serializers.ModelSerializer):
     fee_data = Registration_FeeSerializer(source ='fee',read_only=True)
     category_data = CategorySerializer(source ='category',read_only=True)
     supp_category_data = Supplements_CategorySerilaizer(source='supp_category',read_only=True)
+    percentage_id = serializers.PrimaryKeyRelatedField(source='id',read_only=True)
      
     class Meta:
         model = Percentage_offer
-        fields = [ 'offer_id', 'percentage_cut', 'class_id', 'fee', 'category', 'supp_category','class_data','fee_data','category_data','supp_category_data']
+        fields = ['percentage_id', 'offer_id', 'percentage_cut', 'class_id', 'fee', 'category', 'supp_category','class_data','fee_data','category_data','supp_category_data']
+    def create(self, validated_data):
+        validated_data['offer'] = validated_data['offer']['pk']
+        instance = Percentage_offer.objects.create(**validated_data)
+        return instance
+
 
 class ObjectHasPriceOfferSerializer(serializers.ModelSerializer):
     class Meta:
@@ -25,9 +31,10 @@ class ObjectHasPriceOfferSerializer(serializers.ModelSerializer):
 class PriceOfferSerializer(serializers.ModelSerializer):
     offer_id = serializers.IntegerField(write_only=True)
     price_offer_objects = ObjectHasPriceOfferSerializer(source="objects",read_only=True,many=True)
+    price_id = serializers.PrimaryKeyRelatedField(source='id',read_only=True)
     class Meta:
         model = Price_Offer
-        fields = ['offer_id','price','price_offer_objects']
+        fields = ['price_id','offer_id','price','price_offer_objects']
         
 class OfferSerializer(serializers.ModelSerializer):
     start_date = serializers.DateField(required=True,input_formats=["%Y-%m-%d"])

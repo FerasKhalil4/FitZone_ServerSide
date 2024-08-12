@@ -33,9 +33,10 @@ class Class_Scheduel(models.Model):
         if self.is_deleted!= True:
             self.is_deleted = True
             self.save()
+            
 class Client_Class(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='classes')
     class_id = models.ForeignKey(Class_Scheduel, on_delete=models.CASCADE, related_name='clients')
     retieved_money = models.IntegerField(default=0)
-    retrieved_reason = models.CharField(max_length=40)
+    retrieved_reason = models.CharField(null = True, max_length=40)
     

@@ -20,7 +20,8 @@ registration = [
 		"weight":120,
 		"goal":"Lose Weight",
 		"goal_weight":100,
-		"predicted_date":"2025-01-01"
+		"predicted_date":"2025-01-01",
+  'activity_level':'Low',
 	},
 	"diseases":[
 		1,4

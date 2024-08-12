@@ -2,6 +2,7 @@ from rest_framework import generics, status ,serializers
 from rest_framework.response import Response
 from .models import *
 from .serializers import *
+from wallet.models import Wallet, Wallet_Deposit
 from points.models import Points
 import math, datetime
 from django.db import transaction
@@ -70,13 +71,14 @@ class ClassesDetailAV(generics.RetrieveUpdateDestroyAPIView):
             with transaction.atomic():
                 class_data = Classes.objects.get(pk = pk)
                 current_date = datetime.datetime.now().date()
-                class_scheduel = Class_Scheduel.objects.filter(class_ = pk , start_date__lte = current_date , end_date__gte = current_date )
+                employee = Employee.objects.get(user=request.user.pk)
+                class_scheduel = Class_Scheduel.objects.filter(class_id = pk , start_date__lte = current_date , end_date__gte = current_date )
                 Flag = True
                 clients_to_refund = []
                 
                 for schedule in class_scheduel:
                     enrolled_clients = Client_Class.objects.filter(class_id = schedule.pk)
-                    if len(enrolled_clients) >= (schedule.allowed_number_for_class / 2):
+                    if len(enrolled_clients) >= (math.ceil(schedule.allowed_number_for_class / 2)):
                         Flag = False
                         break 
                     
@@ -90,11 +92,21 @@ class ClassesDetailAV(generics.RetrieveUpdateDestroyAPIView):
                     clients_to_refund.extend(enrolled_clients)
                     
                 if Flag :
+                    cut_percentage = Branch.objects.get(pk=class_data.branch.pk).gym.cut_percentage
+                    
                     for client_data in clients_to_refund:
-                        client_data.client.retieved_money = class_data.registration_fee
-                        client_data.client.retrieved_reason = "Class Closed"
-                        client_data.client.save()
-
+                        amount = 0 if cut_percentage is None else class_data.registration_fee  -  ((class_data.registration_fee / 100) * cut_percentage)
+                        client_data.retieved_money = amount
+                        client_data.retrieved_reason = "Class Closed"
+                        client_data.save()
+                        
+                        wallet = Wallet.objects.get(client = client_data.client)
+                        wallet.balance += amount
+                        wallet.save()
+                        
+                        Wallet_Deposit.objects.create(employee = employee ,client = client_data.client, amount = amount)
+                        
+                        
                     class_data.delete()
 
                     return Response({'message':'data deleted Successfully'}, status=status.HTTP_204_NO_CONTENT)
@@ -109,22 +121,29 @@ classesDetailAV = ClassesDetailAV.as_view()
 
 class ClassScheduleListAV(generics.ListCreateAPIView):
     serializer_class = Class_ScheduelSerializer
+    queryset = Class_Scheduel.objects.all()
+
     
-    def get_queryset(self):
-        class_id = self.request.data.get('pk')
-        current_date = datetime.datetime.now().date()
-        return Class_Scheduel.objects.filter(class_ = class_id , start_date__lte = current_date , end_date__gte = current_date )
+    def get(self, request, *args, **kwargs):
+        try:
+            class_id = kwargs.get('pk')
+            current_date = datetime.datetime.now().date()
+            qs = Class_Scheduel.objects.filter(class_id = class_id , start_date__lte = current_date , end_date__gte = current_date)
+            serializer = self.get_serializer(qs,many=True)
+            qs = serializer.data
+            return Response({'data':qs}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response ({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
     def post(self,request,pk,*args, **kwargs):
         try:
-            
-            check = Class_Scheduel.objects.get(pk=pk)
+            check = Class_Scheduel.objects.get(class_id=pk)
             
             data = request.data
-            data['class_id'] = pk
-            
-            scheduleSerializer = Class_ScheduelSerializer(data=data)
+            data['class_id'] = pk   
+            scheduleSerializer = Class_ScheduelSerializer(data=data,context={'request':request,'branch_id':data['branch_id']})
             scheduleSerializer.is_valid(raise_exception=True)
+            scheduleSerializer.validated_data['class_id'] = Classes.objects.get(pk=data['class_id'])
             scheduleSerializer.save()
                         
             return Response({'message':'schedule has add-ons successfully','data':scheduleSerializer.data}
@@ -138,6 +157,7 @@ Class_ScheduleList = ClassScheduleListAV.as_view()
         
 class ClassScheduleDetailsAv(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = Class_ScheduelSerializer
+    queryset = Class_Scheduel.objects.all()
     
     def update(self, request, pk, *args, **kwargs):
         try:
@@ -151,8 +171,17 @@ class ClassScheduleDetailsAv(generics.RetrieveUpdateDestroyAPIView):
                 if len(check) > (schedule_instance.allowed_number_for_class / 2):
                     return Response({'message':'sechdule Cant be Updated there is clients already Booked at this time'}) 
              
-            serializer = Class_ScheduelSerializer(schedule_instance, data=request.data, partial=True)
-            serializer.is_valid(raise_exceptions=True)
+             
+                number_of_days = (schedule_instance.end_date - schedule_instance.start_date).days
+                middle_day = math.ceil(number_of_days / 2)
+                middle_day_date = schedule_instance.start_date + datetime.timedelta(days=middle_day)
+                current_date = datetime.datetime.now().date()
+                
+                if current_date >  middle_day_date :
+                    return Response({'error':'you cannot delete this schedule'},status=status.HTTP_400_BAD_REQUEST)
+                
+            serializer = Class_ScheduelSerializer(schedule_instance, data=request.data,context={'request':request,'branch_id':data['branch_id']} ,partial=True)
+            serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response({'message':'schedule has Updated successfully','data':serializer.data}
             ,status=status.HTTP_201_CREATED)
@@ -160,22 +189,44 @@ class ClassScheduleDetailsAv(generics.RetrieveUpdateDestroyAPIView):
             return Response({'error':str(e)})
     
     def destroy(self, request, pk, *args, **kwargs):
-        schedule_instance = self.get_object()
-        class_ = Classes.objects.get(pk = schedule_instance.pk)
-        check = Client_Class.objects.filter(pk = schedule_instance.pk)
-            
-        if len(check) > (schedule_instance.allowed_number_for_class / 2):
-            return Response({'message':'sechdule Cant be Updated there is clients already Booked at this time'}) 
         
-        for client_data in check :
-            client_data.client.retieved_money = class_.registration_fee
-            client_data.client.retrieved_reason = "Time for this class is Closed"
-            client_data.client.save()
-        
-        schedule_instance.delete()
-        
-        return Response({'message':' Time in schedule has deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+        try:
+            with transaction.atomic():
+                schedule_instance = self.get_object()
+                class_ = Classes.objects.get(pk = schedule_instance.class_id.pk)
+                check = Client_Class.objects.filter(pk = schedule_instance.pk)
+                employee = Employee.objects.get(user=request.user.pk)
+                cut_percentage = Branch.objects.get(pk=class_.branch.pk).gym.cut_percentage
+                
+                if len(check) >= (math.ceil(schedule_instance.allowed_number_for_class / 2)):
+                    return Response({'error':'you cannot delete this schedule'},status=status.HTTP_400_BAD_REQUEST)
+                
+                number_of_days = (schedule_instance.end_date - schedule_instance.start_date).days
+                middle_day = math.ceil(number_of_days / 2)
+                middle_day_date = schedule_instance.start_date + datetime.timedelta(days=middle_day)
+                current_date = datetime.datetime.now().date()
+                
+                if current_date >  middle_day_date :
+                    return Response({'error':'you cannot delete this schedule'},status=status.HTTP_400_BAD_REQUEST)
 
+                for client_data in check :
+                    amount = 0 if cut_percentage is None else  class_.registration_fee  -  ((class_.registration_fee / 100) * cut_percentage)
+                    client_data.retieved_money = amount
+                    client_data.retrieved_reason = "Time for this class is Closed"
+                    client_data.save()
+                    
+                    
+                    wallet = Wallet.objects.get(client = client_data.client)
+                    wallet.balance += amount
+                    wallet.save()
+                    
+                    Wallet_Deposit.objects.create(employee = employee ,client = client_data.client, amount = amount)
+                
+                schedule_instance.delete()
+                
+                return Response({'message':' Time in schedule has deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            return Response({'error':str(e)})
 Class_ScheduleDetails = ClassScheduleDetailsAv.as_view()
 
         

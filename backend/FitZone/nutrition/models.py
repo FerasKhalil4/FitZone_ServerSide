@@ -6,13 +6,10 @@ from dateutil.relativedelta import relativedelta
 import datetime
 
 class NutritionPlan(models.Model):
+    
     trainer = models.ForeignKey(Trainer, on_delete=models.CASCADE, related_name='nutrition_plans')
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='nutrition_plans')
     name = models.CharField(max_length=20)
-    protein_required = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
-    carbs_required = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
-    fats_required = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
-    calories_required = models.DecimalField(max_digits=6, decimal_places=2, default=0.0)
     start_date = models.DateField(blank=True)
     end_date = models.DateField(blank=True)
     weeks_number = models.PositiveIntegerField(default=0)

@@ -7,7 +7,7 @@ class Wallet(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 class Wallet_Deposit(models.Model):
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE,related_name='walletDeposit')
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE,related_name='walletDeposit',null=True)
     client = models.ForeignKey(Client, on_delete=models.CASCADE,related_name='depositWallet')
     amount  = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)

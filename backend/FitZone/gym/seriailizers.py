@@ -3,6 +3,19 @@ from user.serializers import UserSerializer
 from user.models import User
 from .models import *
 from django.db.models import Q
+from django.contrib.sites.shortcuts import get_current_site
+from django.urls import reverse    
+
+
+def create_qr_code_for_branch(request, validated_data,gym):
+        base_url = get_current_site(request)
+        branch = Branch.objects.create(gym=gym,**validated_data)
+        url = f"http://{base_url}{reverse('equipment_detail', args=[str(branch.pk)])}"
+        branch.url = url
+        branch.save()
+        return branch
+    
+    
 class Registration_FeeSerializer(serializers.ModelSerializer):
     fee_id = serializers.PrimaryKeyRelatedField(source='id',read_only=True)
     class Meta:
@@ -14,7 +27,13 @@ class BranchSerializer(serializers.ModelSerializer):
     address = serializers.CharField(max_length=50)
     class Meta :
         model = Branch
-        fields = ['id','address' ,'city','street', 'has_store' , 'is_active']
+        fields = ['id','address' ,'city','street', 'has_store' , 'is_active','qr_code_image','url']
+        
+    def create(self, validated_data):
+        request = self.context.get('request')
+        print(validated_data)
+        gym = validated_data.pop('gym', None)
+        return create_qr_code_for_branch(request, validated_data,gym)
 
 class WomanHoursSerializer(serializers.ModelSerializer):
     start_hour = serializers.TimeField(format="%H:%M:%S")
@@ -81,15 +100,15 @@ class GymSerializer(serializers.ModelSerializer):
         if data.get('allow_retrival') == True and (not data.get('duration_allowed') or not data.get('cut_percentage')):
              raise serializers.ValidationError({'error':'please provide the complete data about the dutation and the percentage cut'})
         return data
-        
+
     def create(self, validated_data):
+        request = self.context.get('request')
         if not validated_data.get('manager_details') and not validated_data.get('manager_id') :
             raise serializers.ValidationError({'error':'please provide the manager_id or the data to create manger '})
         branch_data = validated_data.pop('branch',None)
         manager_data = validated_data.pop('manager_details',None)
         manager_id = validated_data.pop('manager_id' , None)
         woman_hours = validated_data.pop('woman_hours',[])
-        branch_serializer = BranchSerializer(data = branch_data)
 
         woman_serializer = WomanHoursSerializer(data = woman_hours )
         
@@ -110,10 +129,8 @@ class GymSerializer(serializers.ModelSerializer):
         
         woman_hours_instances = []
         
-        if branch_serializer.is_valid():  
-            branch = branch_serializer.save(gym=gym)
-        else:
-            raise serializers.ValidationError(branch_serializer.errors)
+        branch = create_qr_code_for_branch(request, branch_data,gym)
+
         for woman_hour in woman_hours:   
             woman_serializer = WomanHoursSerializer(data=woman_hour)
             woman_serializer.is_valid(raise_exception=True)
@@ -194,7 +211,6 @@ class ShiftSerializer(serializers.ModelSerializer):
         return data
     
     def validate_days_off(self,data):
-
       
         days = list(data.values())
         if len(days) != len(set(days)):
@@ -219,4 +235,4 @@ class TrainerSerialzier(serializers.ModelSerializer):
     employee = EmployeeSerializer(read_only=True)
     class Meta:
         model = Trainer 
-        fields= ['id','employee','employee_id','num_of_trainees','allow_public_posts','session_period','online_training_price','private_training_price']
+        fields= ['id','employee','employee_id','allow_public_posts','online_training_price','private_training_price']

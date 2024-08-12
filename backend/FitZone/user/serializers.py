@@ -75,7 +75,8 @@ class GoalSerializer(serializers.ModelSerializer):
     is_deleted = serializers.BooleanField(write_only=True,required=False)
     class Meta:
         model = Goal
-        fields = ['client','weight','goal','goal_weight','predicted_date','status','is_deleted','number_updates','achieved_weight']
+        fields = ['client','weight','goal','goal_weight','predicted_date','status','is_deleted',
+                  'number_updates','achieved_weight','activity_level','protein_required','fats_required','calories_required']
         ordering = ['created_at']
         read_only_fields = ['number_updates','status']
 

@@ -132,7 +132,6 @@ class Class_ScheduelSerializer(serializers.ModelSerializer):
         used_data = get_used_data(data['days_of_week'])
         
         request = self.context.get('request')
-        print('00000000000000000000000000')
         user = request.user
         branch_id = self.context.get('branch_id')
         gym = get_gym_details(branch_id)        

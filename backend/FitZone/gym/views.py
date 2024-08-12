@@ -7,6 +7,7 @@ from user.serializers import UserSerializer
 from .seriailizers import *
 from .models import Gym, Branch , Employee
 from .permissions import admin_permissions  , Manager_permissions, admin_manager_permissions
+from trainer.models import TrainerGroups
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
 from community.paginations import Pagination
@@ -20,19 +21,21 @@ class GymListCreateAV(generics.ListCreateAPIView):
         return Gym.objects.filter(is_deleted = False).all()    
     @transaction.atomic
     def post (self, request, *args, **kwargs): 
-        data = request.data.dict()
+        data = request.data
+        if type(data) is not dict:
+            data = data.dict()
         try:  
             with transaction.atomic():
+                print(data['registration_fee'])
                 registration_fee = json.loads(data.pop('registration_fee')) 
+                
                 data['woman_hours'] = json.loads(data.pop('woman_hours'))
                 data['manager_details'] = json.loads(data.pop('manager_details'))
                 data['branch'] = json.loads(data.pop('branch'))
-                print(data)
                 
-                gym_serializer = GymSerializer(data = data)        
+                gym_serializer = GymSerializer(data = data,context = {'request': request})        
                 if gym_serializer.is_valid(raise_exception=True):
                     gym = gym_serializer.save()
-                    print(gym)
                     fee_details = []
                     for fee in registration_fee :       
                         fee['gym'] = gym.id
@@ -136,7 +139,7 @@ managergymAV = ManagerGymListAV.as_view()
 class BracnchAV(generics.ListCreateAPIView):
     serializer_class = BranchSerializer 
     queryset = Branch.objects.all()
-    permission_classes = [admin_manager_permissions]
+    # permission_classes = [admin_manager_permissions]
     
     def get(self , request , pk , *args , **kwargs):
         branches_data = {}
@@ -155,7 +158,7 @@ class BracnchAV(generics.ListCreateAPIView):
     def create(self , request , pk , *args , **kwargs):
         gym = Gym.objects.get(id=pk)
         data = request.data 
-        serializer = BranchSerializer(data = data)
+        serializer = BranchSerializer(data = data,context={'request': request})
         if serializer.is_valid(raise_exception=True):
             serializer.save(gym=gym)
             return Response({'message':"Branch Created successfully",
@@ -304,6 +307,12 @@ class ShiftsUpdateAV(generics.RetrieveAPIView):
                 for shift in shifts:
                     shift.is_active = False
                     shift.save()
+            if shift_.employee.user.role == 4 :
+                groups = TrainerGroups.objects.filter(trainer = shift_.employee.trainer.pk)
+                for group in groups:
+                    group_is_deleted = False
+                    group.save()
+                    
             serializer = ShiftSerializer(shift_, data=data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save() 
@@ -321,3 +330,11 @@ class Registration_feeListAV(generics.ListAPIView):
         return Registration_Fee.objects.filter(gym_id=self.kwargs['gym_id'])
     
 fee_list = Registration_feeListAV.as_view()
+
+
+# check on the client registrarion and start session
+
+# class ClientSession(generics.CreateAPIView):
+#     serializer_class = 
+#     def post(self,request, *args, **kwargs):
+#         if 

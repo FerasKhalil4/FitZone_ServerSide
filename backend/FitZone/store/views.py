@@ -48,6 +48,12 @@ class StoreMixin():
         if 'product' in validated_data and 'product_id' in validated_data:
             raise serializers.ValidationError('Product already in request body')
         return validated_data
+    
+    def check_store(self,branch_id) -> None:
+        if Branch.objects.get(pk=branch_id).has_store:
+            pass 
+        else :
+            raise ValueError('this branch does not have a store')
         
 
     
@@ -173,6 +179,7 @@ class AccessoriesListAV(StoreMixin,generics.ListCreateAPIView):
     def post(self, request,branch_id, *args, **kwargs):
         try:
             with transaction.atomic():
+                self.check_store(branch_id)
                 image = request.FILES.get('image_path',None)
                 
                 data = request.data.dict()
@@ -199,11 +206,12 @@ class AccessoriesListAV(StoreMixin,generics.ListCreateAPIView):
                         if item['color'] == instance.color and item['size'] == instance.size:
                             details['amount'] = item['amount']
                             self.create_branch_product(details, branch_id, instance, 'Accessory')
-                
-                                    
+                    
+                                        
 
-            return Response({"message": "Accessories processed successfully."}, status=status.HTTP_201_CREATED)
+                return Response({"message": "Accessories processed successfully."}, status=status.HTTP_201_CREATED)
 
+            
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -220,8 +228,11 @@ class SupplementsListAV(StoreMixin,generics.ListCreateAPIView):
         try:
             # check(data,image = image) 
             with transaction.atomic():
+                self.check_store(branch_id)
+                
                 image = request.FILES.get('image_path',None)
                 data = request.data.dict()
+                
                 
                 self.check_product(data)
                 
@@ -260,6 +271,8 @@ class MealListAV(StoreMixin,generics.ListCreateAPIView):
     def post(self, request, branch_id, *args, **kwargs):
         try:
             with transaction.atomic():
+                self.check_store(branch_id)
+                
                 image = request.FILES.get('image_path',None)
                 data = request.data.dict()
                 

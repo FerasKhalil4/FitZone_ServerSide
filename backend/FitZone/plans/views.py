@@ -41,7 +41,7 @@ class PlanMixin():
     def Create_Workouts(self,workouts,plan):
         
         for i in range(len(workouts)):
-            if 'name' not in workouts[i]:
+            if len(workouts[i]['name']) == 0:
                 workouts[i]['name'] = 'Rest'
         self.check_workout(workouts)
         for workout in workouts:
@@ -166,7 +166,10 @@ class Gym_planDetailsAV(PlanMixin,generics.RetrieveUpdateAPIView):
     def get(self, request, *args, **kwargs):
         try:
             plan = Gym_Training_plans.objects.get(gym_id =kwargs.get('gym_id'))
-            return Response (Gym_Training_plansSerializer(plan).data, status=status.HTTP_200_OK)
+            serializer = Gym_Training_plansSerializer(plan)
+            return Response (serializer.data, status=status.HTTP_200_OK)
+        except Gym_Training_plans.DoesNotExist:
+            return Response({'error':'Gym Plan not found'},status=status.HTTP_404_NOT_FOUND)
         except Exception as e :
             return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
      
