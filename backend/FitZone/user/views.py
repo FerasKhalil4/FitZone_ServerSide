@@ -123,7 +123,7 @@ class LoginAV(APIView):
     
     def post(self , request, *args, **kwargs):
         data={}
-        account = User.objects.filter(username = request.data.get('username') , is_deleted = False) .first()   
+        account = User.objects.filter(username = request.data.get('username') , is_deleted = False).first()   
         
         if account :
             if account.check_password(request.data.get('password')):

@@ -10,7 +10,7 @@ from django.urls import reverse
 def create_qr_code_for_branch(request, validated_data,gym):
         base_url = get_current_site(request)
         branch = Branch.objects.create(gym=gym,**validated_data)
-        url = f"http://{base_url}{reverse('equipment_detail', args=[str(branch.pk)])}"
+        url = f"http://{base_url}{reverse('check_session', args=[str(branch.pk)])}"
         branch.url = url
         branch.save()
         return branch
@@ -27,7 +27,7 @@ class BranchSerializer(serializers.ModelSerializer):
     address = serializers.CharField(max_length=50)
     class Meta :
         model = Branch
-        fields = ['id','address' ,'city','street', 'has_store' , 'is_active','qr_code_image','url']
+        fields = ['id','address' ,'city','street', 'has_store' , 'is_active','qr_code_image','url','number_of_clients_allowed','current_number_of_clients',]
         
     def create(self, validated_data):
         request = self.context.get('request')
@@ -87,13 +87,14 @@ class GymSerializer(serializers.ModelSerializer):
     duration_allowed = serializers.IntegerField(write_only=True , required = False)
     cut_percentage = serializers.FloatField(write_only=True ,required = False)
     fees = Registration_FeeSerializer(read_only=True,many=True)
+    branch_data = BranchSerializer(source='gym',read_only=True,many=True)
     
     class Meta:
         model = Gym
         fields =['id','allow_public_posts','allow_public_posts','name' , 'description','image_path',
                  'created_at','start_hour','close_hour' ,'mid_day_hour','manager',
-                 'manager_id','manager_details','branch','woman_gym','woman_hours',
-                 'allow_retrival', 'duration_allowed', 'cut_percentage','fees','number_of_clients_allowed','current_number_of_clients','allowed_days_for_registraiton_cancellation']   
+                 'manager_id','manager_details','branch','woman_gym','woman_hours','allow_branches_access','branch_data',
+                 'allow_retrival', 'duration_allowed', 'cut_percentage','fees','allowed_days_for_registraiton_cancellation']   
         
         
     def validate(self ,data):

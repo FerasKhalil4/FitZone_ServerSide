@@ -21,15 +21,23 @@ class Gym(models.Model):
     allow_public_posts = models.BooleanField(default=True)
     allow_public_products = models.BooleanField(default=True)
     allowed_days_for_registraiton_cancellation = models.IntegerField(default=0)
-    number_of_clients_allowed = models.IntegerField(default=0)
-    current_number_of_clients= models.IntegerField(default=0)
+    allow_branches_access = models.BooleanField(default=False)
 
     def __str__(self) -> str:
         return f"{self.id}:{self.name}"
     
+    
 class Registration_Fee(models.Model):
+    TYPE_CHOICES = [
+        ('1_day','1_day'),
+        ('15_days','15_days'),
+        ('monthly','monthly'),
+        ('3_months','3_months'),
+        ('6_months','6_months'),
+        ('yearly','yearly'),
+    ]
     gym = models.ForeignKey(Gym , on_delete=models.CASCADE,related_name="fees" )
-    type = models.CharField(max_length=50)
+    type = models.CharField(max_length=50,choices=TYPE_CHOICES)
     fee = models.FloatField(default = 0.0)
     
     class Meta:
@@ -52,6 +60,8 @@ class Branch(models.Model):
     is_active = models.BooleanField(default=True)
     url = models.URLField(blank=True)
     qr_code_image = models.ImageField(upload_to='qr_codes', null=True, blank=True)
+    number_of_clients_allowed = models.IntegerField(default=0)
+    current_number_of_clients= models.IntegerField(default=0)
     
     def generate_qr_code(self,data):
         url = data

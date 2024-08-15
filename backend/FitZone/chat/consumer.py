@@ -86,7 +86,6 @@ class NewChatConsumer(BaseChatConsumer):
             data['user_1'] = self.scope.get('user').pk
             data['user_2'] = self.receiver 
             
-            print(self.receiver)
             chat_serializer = ChatroomSerializer(data=data)
             chat_serializer.is_valid(raise_exception=True)
             self.chatroom = chat_serializer.save()

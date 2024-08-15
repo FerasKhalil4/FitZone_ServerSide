@@ -1,6 +1,8 @@
 from django.db import models
 from user.models import Client
 from gym.models import Gym, Trainer
+from equipments.models import Equipment
+from disease.models import Limitations, Client_Disease
 from equipments.models import Equipment_Exercise
 from dateutil.relativedelta import relativedelta
 from django.core.exceptions import ValidationError
@@ -72,10 +74,29 @@ class Workout_Exercises(models.Model):
     reps = models.JSONField(default=dict)
     rest_time_seconds = models.IntegerField(blank=True)
     order = models.PositiveIntegerField(default=0)
+    
     class Meta:
         constraints=[
             models.UniqueConstraint(fields=['workout', 'exercise', 'order'], name='unique_workout_exercise_order')
         ]
+    
+    def check_equipment_limitaiotns(self):
+        
+        equipment_limitations = Limitations.objects.filter(equipment=self.exercise.equipment)
+        equipment_diseases = [limitations.disease.pk for limitations in equipment_limitations]
+        client_diseases = Client_Disease.objects.filter(client=self.workout.training_plan.TrainersClientsPlans.client.pk,
+                                                        disease__in=equipment_diseases)
+        if client_diseases.exists():
+            raise ValidationError(f'this client has disease {client_diseases.first().disease.name} he cant use this machine {self.exercise.equipment}')
+        
+        
+    def clean(self):
+        super().clean()
+        self.check_equipment_limitaiotns()
+        
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
     
 class Client_Trianing_Plan(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="PrivateTrainingPlans")
@@ -86,7 +107,10 @@ class Client_Trianing_Plan(models.Model):
     is_active = models.BooleanField(default=True)
     plan_duration_weeks = models.IntegerField(default=0)
     
+    
+
     def save(self, *args, **kwargs):
+        self.clean()
         if self.start_date and self.plan_duration_weeks:
             self.end_date = self.start_date + relativedelta(weeks=self.plan_duration_weeks)
         super().save(*args, **kwargs)

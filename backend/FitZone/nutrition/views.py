@@ -117,7 +117,7 @@ class MealsDetailsAV(generics.RetrieveUpdateDestroyAPIView):
         return super().get(request, *args, **kwargs)
     
     @extend_schema(
-        summary='Get a meal',
+        summary='Update a meal',
         examples=meal
     )
     def put(self, request,*args, **kwargs):

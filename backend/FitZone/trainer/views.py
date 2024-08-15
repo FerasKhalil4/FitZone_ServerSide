@@ -172,7 +172,7 @@ class TrainerGroupsDetailAV(generics.RetrieveUpdateDestroyAPIView):
         return super().get(request, *args, **kwargs)
     
     @extend_schema(
-        summary='get a group',
+        summary='update a group',
         examples=group
     )
     def put(self, request, *args, **kwargs):

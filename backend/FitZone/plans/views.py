@@ -41,14 +41,14 @@ class PlanMixin():
     def Create_Workouts(self,workouts,plan):
         
         for i in range(len(workouts)):
-            if len(workouts[i]['name']) == 0:
+            name = workouts[i].get('name',None)
+            if name is None:
                 workouts[i]['name'] = 'Rest'
         self.check_workout(workouts)
         for workout in workouts:
             exercises = workout.pop('exercises',[])
             workout['training_plan'] = plan.pk
             self.check_incompatibility(workout)
-            print(workout)
             workout_serializer = WorkoutSerializer(data=workout)
             workout_serializer.is_valid(raise_exception=True)
             workout_instance = workout_serializer.save()
@@ -126,7 +126,6 @@ class Gym_TrainingPlanCreateAV(PlanMixin,generics.CreateAPIView):
     def post(self, request, *args, **kwargs):
         try:
             with transaction.atomic():
-                
                 gym_id = self.kwargs['gym_id']
                 check  = Gym_Training_plans.objects.filter(gym=gym_id)
                 
@@ -135,7 +134,6 @@ class Gym_TrainingPlanCreateAV(PlanMixin,generics.CreateAPIView):
                 
                 data = request.data
                 workouts = data.pop('workouts', [])
-                
                 plan = self.Create_Training_plan(data)
 
                 gym_plan_data = {
@@ -373,7 +371,9 @@ class ClientTrainingPlanListAV(PlanMixin,generics.ListCreateAPIView):
                 self.check_client_availabilty(trainer,client)
                                 
                 self.check_client_existing_plan(client)
+                
                 plan = self.Create_Training_plan(data)
+                
                 client_plan_data = {
                     'client':client.pk,
                     'trainer':trainer.pk,                    
@@ -385,8 +385,10 @@ class ClientTrainingPlanListAV(PlanMixin,generics.ListCreateAPIView):
                 client_plan_data = ClientTrainingSerializer(data=client_plan_data)
                 client_plan_data.is_valid(raise_exception=True)
                 client_plan_data.save()
+                print('0000000000')
                 
                 self.Create_Workouts(workouts, plan)
+                print('0000000000')
                 
                 return Response({'success': 'Trianing plan created successfully'},status=status.HTTP_201_CREATED)
                 

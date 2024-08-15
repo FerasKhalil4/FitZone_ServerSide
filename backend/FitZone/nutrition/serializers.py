@@ -60,14 +60,9 @@ class NutritionPlanSerializer(serializers.ModelSerializer):
         model = NutritionPlan
         fields = [
             'nutrition_plan_id', 'trainer', 'client', 'name',
-            'maintain_fats', 'maintain_protein', 'maintain_calories',
             'start_date', 'end_date', 'weeks_number', 'notes', 'is_active', 'meals_schedule','is_same'
         ]
         
-    def validate_value(self, value):
-        if value <= 0:
-            raise serializers.ValidationError(f'{value}must be greater than 0')
-        return value
     def check_client_plan(self,client,trainer,today):
         check = NutritionPlan.objects.filter(client=client,start_date__lte = today, end_date__gte = today,is_active=True)
         if check.exists():
@@ -83,10 +78,6 @@ class NutritionPlanSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('schedule must contain 7 days')
         return schedule
     def validate(self,data):
-        self.validate_value(data['maintain_calories'])
-        self.validate_value(data['maintain_fats'])
-        self.validate_value(data['maintain_protein'])
-        # self.validate_schedule(data['meals_schedules'])
         if  data['is_same'] == True and len(data['meals_schedules']) != 1:
             raise serializers.ValidationError('Multiple schedules where added but is_same flag is set to True also ')
         return data
