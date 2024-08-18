@@ -6,13 +6,15 @@ from .serializers import Client_BranchSerializer, Branch_SessionsSerializer
 from .DataExamples import *
 from equipments.models import Diagram
 from gym.models import Branch, Woman_Training_Hours
+from plans.models import Gym_plans_Clients, Client_Trianing_Plan
+from plans.serializers import Gym_plans_ClientsSerializer, ClientTrainingSerializer
 from equipments.serializers import DiagramSerialzier
 from django.db.models import Q
 import datetime
 from drf_spectacular.utils import extend_schema
 from django.db import transaction
-
-
+# from .tasks import deactivate_subs,test_task
+from .tasks import deactivate_subs
 
 now = datetime.datetime.now()
 
@@ -34,13 +36,18 @@ def check_Session(request,*args, **kwargs):
             current_hour = now.time()
             
             women_hours = Woman_Training_Hours.objects.filter(gym=branch.gym)
-            
+
             for hour in women_hours :
+  
                 if hour.day_of_week.lower() == today and request.user.gender == True and hour.start_hour <= current_hour and hour.end_hour >= current_hour:
                     return Response({'error':'you cant start your session now its women traingin hours'}, status=status.HTTP_400_BAD_REQUEST)
-            
+            try:
+                client = Client.objects.get(user=request.user.pk)
+            except Client.DoesNotExist:
+                return Response({'error':'client does not exist'}, status=status.HTTP_400_BAD_REQUEST)
+
             base_query = Q(
-                    user = request.user.pk,
+                    client =client.pk,
                     start_date__lte = today_date,
                     end_date__gte = today_date,
                     is_active = True,
@@ -54,11 +61,25 @@ def check_Session(request,*args, **kwargs):
                 check = Gym_Subscription.objects.filter(base_query)   
                 
                 if check.exists():
-                    diagrams = Diagram.objects.filter(branch=branch_id)
-                    return Response(DiagramSerialzier(diagrams,many=True).data,status=status.HTTP_200_OK)
-                
+                    # diagrams = Diagram.objects.filter(branch=branch_id)
+                    query = Q(
+                        start_date__lte = now.date()
+                        ,end_date__gte = now.date()
+                        , client = client
+                        ,is_active=True
+                    )
+                    gym_training_plan =Gym_plans_Clients.objects.filter(query)
+                    if gym_training_plan.exists():
+                        serializer = Gym_plans_ClientsSerializer(gym_training_plan)
+                        return Response(serializer.data,status=status.HTTP_200_OK)
+    
+                    client_training_plan = Client_Trianing_Plan.objects.filter(query)
+                    if client_training_plan.exists():
+                        serializer = ClientTrainingSerializer(client_training_plan)
+                        return Response(serializer.data,status=status.HTTP_200_OK)
+                    return Response({'success':'Success'}, status=status.HTTP_200_OK)
                 else:
-                    return Response({'error':'your gym membership is expired'},status=status.HTTP_400_BAD_REQUEST)
+                    return Response({'error':'your gym membership is expired or you are not registered in this branch'},status=status.HTTP_400_BAD_REQUEST)
             else :
                 
                 try:
@@ -77,7 +98,8 @@ def check_Session(request,*args, **kwargs):
                                     
         except Exception as e:
             return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
-        
+    else :
+        return Response({'error':'user is not authenticated'},status=status.HTTP_400_BAD_REQUEST)
         
 class SubscribtionsListAV(generics.ListCreateAPIView):
     
@@ -129,9 +151,11 @@ class SubscribtionsDetailsAV(generics.RetrieveUpdateDestroyAPIView):
         summary='update the current subscription',
         examples=[]
     )
+    
     def put(self,request,*args, **kwargs):
         try:
             with transaction.atomic():
+                
                 client = Client.objects.get(user=request.user.pk)
                 request.data['client'] = client.pk
                 request.data['branch'] =self.get_object().branch.pk
@@ -153,15 +177,32 @@ class SubscribtionsDetailsAV(generics.RetrieveUpdateDestroyAPIView):
 subscribtion_details = SubscribtionsDetailsAV.as_view()
 
 
-@extend_schema(
-        summary='deactivate the expired subscriptions'
-    )
-@api_view(['GET'])
-def check_subscription(request,*args, **kwargs):
-    try:
-        expired_subs = Gym_Subscription.objects.filter(end_date__lt = now.date(),is_active = True)
-        expired_subs.update(is_active=False)
+# @extend_schema(
+#         summary='deactivate the expired subscriptions'
+#     )
+# @api_view(['GET'])
+# def check_subscription(request,*args, **kwargs):
+#     try:
         
-        return Response({'success':'SUCCESS'},status=status.HTTP_200_OK)
-    except Exception as e:
-        return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
+#         # branch = Branch.objects.get(id=kwargs['branch_id'])
+#         # expired_subs = Gym_Subscription.objects.filter(end_date__lt = now.date(),is_active = True)
+#         # branch_subs_count = expired_subs.filter(branch=kwargs['branch_id']).count()
+#         # expired_subs.update(is_active=False)
+#         # branch.current_number_of_clients -= branch_subs_count
+#         # branch.save()
+#         deactivate_subs.delay(kwargs['branch_id'])
+
+#         return Response({'success':'SUCCESS'},status=status.HTTP_200_OK)
+#     except Exception as e:
+#         return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
+    
+    
+    
+# @api_view(['GET'])
+# def hi(request,*args, **kwargs):
+#     hi_.delay()
+#     return Response({'success':'task scheduled'},status=status.HTTP_200_OK)
+    
+    
+
+

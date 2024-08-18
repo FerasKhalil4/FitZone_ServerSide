@@ -6,7 +6,7 @@ from disease.models import Limitations, Client_Disease
 from equipments.models import Equipment_Exercise
 from dateutil.relativedelta import relativedelta
 from django.core.exceptions import ValidationError
-
+from datetime import datetime
 class Training_plan(models.Model):
     notes = models.TextField(blank=True)
     
@@ -21,20 +21,17 @@ class Gym_Training_plans(models.Model):
         ]
 
 class Gym_plans_Clients(models.Model):
-    gym_training_plan = models.ForeignKey(Training_plan, on_delete=models.CASCADE, related_name="clients")
+    gym_training_plan = models.ForeignKey(Gym_Training_plans, on_delete=models.CASCADE, related_name="clients")
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="gymPlans")
     start_date = models.DateField(auto_now_add=True)
-    end_date = models.DateField(blank=True)
+    end_date = models.DateField(null=True)
     is_active = models.BooleanField(default=True)
-    
+        
     def save(self,*args, **kwargs):
-        if self.start_date:
-            self.end_date =  self.start_date + relativedelta(weeks=self.gym_training_plan.plan_duration_weeks)
-            self.save()
+        if self.end_date is None:
+            self.end_date = datetime.now().date() + relativedelta(weeks=self.gym_training_plan.plan_duration_weeks)
         super().save(*args, **kwargs)           
             
-    
-    
 class Workout(models.Model):
     training_plan = models.ForeignKey(Training_plan, on_delete=models.CASCADE,related_name="workouts")
     name = models.CharField(max_length=50,null=True)

@@ -2,6 +2,7 @@ from offers.models import ObjectHasPriceOffer,Percentage_offer
 from gym.models import Registration_Fee
 from wallet.models import Wallet, Wallet_Deposit
 from Vouchers.models import Redeem
+from plans.models import Gym_plans_Clients, Client_Trianing_Plan,Gym_Training_plans
 from datetime import datetime
 from django.core.exceptions import ValidationError
 
@@ -50,7 +51,7 @@ class OfferSubscriptionService:
     def offer_check(data):
         offer_code = data.pop('offer_code', None)
         vouchers = data.pop('vouchers',None)
-        
+        new_fee = None
         
         fee = Registration_Fee.objects.get(pk=data['registration_type'].pk).fee
         
@@ -60,6 +61,7 @@ class OfferSubscriptionService:
                 new_fee = new_price
                 
         new_fee = new_fee if new_fee is not None else fee
+        
         if offer_code is not None:
             
             offer_percentage = OfferSubscriptionService.check_percentage_offers(data['registration_type'], offer_code,data['branch'])
@@ -74,7 +76,7 @@ class OfferSubscriptionService:
             new_fee = new_fee - discount
             
             
-        data['price_offer'] = new_fee if new_fee is not None else None    
+        data['price_offer'] = new_fee if new_fee is not None else None   
         return data
     
 
@@ -108,3 +110,21 @@ class SubscriptionService:
                                                 ,amount=fee
                                                 ,employee=None
                                                 ,tranasaction_type='retrieve')
+            
+    
+class Activate_Gym_Training_Plan:
+    
+    @staticmethod
+    def add_training_plan(data):
+        try:
+            check_plan = Gym_Training_plans.objects.get(gym=data['branch'].gym)
+        except Gym_Training_plans.DoesNotExist :
+            return None 
+        
+        Gym_plans_Clients.objects.create(
+            client = data['client'],
+            gym_training_plan = check_plan,
+        )
+        
+        
+        

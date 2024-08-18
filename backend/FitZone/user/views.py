@@ -13,6 +13,7 @@ from .DataExample import *
 from disease.serializers import Client_DiseaseSerilaizer
 from gym.models import Employee , Shifts , Branch, Gym
 from gym.seriailizers import EmployeeSerializer  ,ShiftSerializer 
+from gym_sessions.models import Gym_Subscription
 from points.models import Points
 from wallet.models import Wallet
 from wallet.serializers import WalletSerializer
@@ -92,15 +93,6 @@ class RegistrationAV(generics.CreateAPIView):
                             serilaizer = Client_DiseaseSerilaizer(data=disease_)
                             serilaizer.is_valid(raise_exception=True)
                             serilaizer.save()
-                            
-       
-                    # if user_profile['role'] == 3 or user_profile['role'] == 4:
-                    #     employee = Employee.objects.get(user_id=user_profile['id'])
-                    #     branch_id = Shifts.objects.get(employee=employee, is_active= True).branch_id
-                    #     gym_id = Branch.objects.get(id=branch_id).gym_id
-                    #     data['branch_id'] = branch_id
-                    #     data['gym_id'] = gym_id
-                        #do the same for client
                         
                     refresh = RefreshToken.for_user(account['user'])
                     data['token'] = {
@@ -196,12 +188,23 @@ class LoginAV(APIView):
                             return Response({'error':'you cant login now, shift is not allowed'})
                     except Exception as e:
                         raise serializers.ValidationError({'error':str(e)})
+                elif account.role == 5:
+                    client_current_sub = None
+                    try:
+                        client = Client.objects.get(user__pk =account.pk)
+                        client_current_sub = Gym_Subscription.objects.get(client=client.pk, is_active=True)
+                    except Client.DoesNotExist:
+                        return Response({'error':'Account does not exist'},status=status.HTTP_400_BAD_REQUEST)
+                    except Gym_Subscription.DoesNotExist:
+                        pass
+                    data['branch_id'] = client_current_sub.branch.pk if client_current_sub is not None else None
                 refresh = RefreshToken.for_user(account)
                 
                 data['token'] = {'refresh_token':str(refresh) ,
                                 'access':str(refresh.access_token)} 
                 
                 data['username'] = account.username  
+                data['user_id'] = account.pk
                 data['role'] = account.role
 
                 return Response(data, status = status.HTTP_200_OK)

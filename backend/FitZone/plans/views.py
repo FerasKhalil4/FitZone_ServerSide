@@ -1,13 +1,17 @@
+from rest_framework.decorators import api_view
 from rest_framework import generics, status 
 from rest_framework.response import Response
 from .serializers import *
 from .DataExamples import * 
 from trainer.models import Client_Trainer
+from gym.models import Branch
+from nutrition.models import NutritionPlan
 from django.db import transaction
 from django.db.models import Q
 from drf_spectacular.utils import  extend_schema
 import datetime 
 from django.core.exceptions import ValidationError
+from .tasks import deactivate_plans
 
 class PlanMixin():
     def check_incompatibility(self,data):
@@ -452,4 +456,16 @@ class PlanUpdateStatusAV(generics.UpdateAPIView):
             return Response({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
 planstatus = PlanUpdateStatusAV.as_view()
         
+    
+# @extend_schema(
+#         summary='deactivate the expired plans'
+#     )
+# @api_view(['GET'])
+# def check_plans(request,*args, **kwargs):
+#     try:
+#         with transaction.atomic():
+#             deactivate_plans.delay()
+#             return Response({'success':'SUCCESS'},status=status.HTTP_200_OK)
+#     except Exception as e:
+#         return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
     

@@ -4,6 +4,7 @@ from user.models import Client
 from gym.models import Branch, Registration_Fee
 from wallet.models import Wallet, Wallet_Deposit
 from offers.models import Percentage_offer, ObjectHasPriceOffer
+from plans.models import Gym_plans_Clients
 from dateutil.relativedelta import relativedelta
 from django.core.exceptions import ValidationError
 from django.db.models import Q
@@ -38,7 +39,20 @@ class Gym_Subscription(models.Model):
     def check_registration_branch(self):
         if not self.branch.gym == self.registration_type.gym :
             raise ValidationError('Registration type must be for the same gym')
-            
+    
+    def check_client_gym_trianing_plan(self):
+        query = Q(
+            client=self.client, 
+            start_date__lte = now,
+            end_date__gte = now,
+            is_active=True,
+        ) & ~Q(
+            gym_training_plan__gym = self.branch.gym.pk
+        )
+        check = Gym_plans_Clients.objects.filter(query)
+        check.update(is_active=False)
+        
+               
     def check_registration_client_balance(self):
         
         if self.price_offer is None:
@@ -47,7 +61,8 @@ class Gym_Subscription(models.Model):
             fee = self.price_offer
         
         if self.pk is None:
-            
+            self.branch.current_number_of_clients += 1
+            self.branch.save()
             SubscriptionService.check_client_balance(self.client,fee,'cut')
             
         else:
@@ -101,6 +116,9 @@ class Gym_Subscription(models.Model):
                 
                 self.is_active = False
                 self.save()
+                self.branch.current_number_of_clients -= 1
+                self.branch.save()
+                
                 if self.branch.gym.cut_percentage is not None:
                     print('check if the gym allows to retrieve money')
                     fee = self.registration_type.fee
@@ -111,10 +129,21 @@ class Gym_Subscription(models.Model):
     def clean(self)->None:
         super().clean()
         self.allowed_date= now + relativedelta(days=self.branch.gym.allowed_days_for_registraiton_cancellation)
+        print('check')
         self.check_gym_capacity()
+        print('check')
         self.check_registration_branch()
+        print('check')
+        
         self.check_registration_overlap()
+        print('check')
+        
+        self.check_client_gym_trianing_plan()
+        print('check')
+        
         self.check_registration_client_balance()
+        print('check')
+        
         
     def create_end_date(self):
         durarion_mapping = {
@@ -135,6 +164,8 @@ class Gym_Subscription(models.Model):
 
             
     def save(self,*args, **kwargs):
+        print('check')
+        
         self.clean()
         self.create_end_date()
         return super().save(*args, **kwargs)    

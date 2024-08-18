@@ -26,7 +26,6 @@ class Gym(models.Model):
     def __str__(self) -> str:
         return f"{self.id}:{self.name}"
     
-    
 class Registration_Fee(models.Model):
     TYPE_CHOICES = [
         ('1_day','1_day'),
@@ -102,9 +101,7 @@ class Trainer(models.Model):
     allow_public_posts = models.BooleanField(default=True)
     private_training_price = models.FloatField(default=0.00)
     online_training_price = models.FloatField(default=0.00)
-    
 
-    
 class Shifts (models.Model):
     employee = models.ForeignKey(Employee , on_delete=models.CASCADE, related_name="employee")
     branch = models.ForeignKey(Branch , on_delete=models.CASCADE,related_name="branch")

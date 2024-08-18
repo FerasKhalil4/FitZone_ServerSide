@@ -13,13 +13,19 @@ days_of_week = {
     7: 'saturday'
 }
 
+now = datetime.datetime.now()
 
 class TrainerGroupsSerializer(serializers.ModelSerializer):
     gym_data = GymSerializer(source='gym',read_only=True)
     group_id = serializers.PrimaryKeyRelatedField(source = 'id', read_only=True)
+    current_group_capacity = serializers.SerializerMethodField()
     class Meta:
         model = TrainerGroups
-        fields = ['group_id','clients','trainer','gym','start_hour','end_hour','group_capacity','days_off','gym_data']
+        fields = ['group_id','clients','trainer','gym','start_hour','end_hour','group_capacity','days_off','gym_data','current_group_capacity']
+        
+    def get_current_group_capacity(self,obj):
+        capacity = Client_Trainer.objects.filter(group = obj.pk,start_date__lte = now,end_date__gte=now).count()
+        return capacity
         
     def get_days(self, days):
         return{day:name for day, name in days_of_week.items() if name in days.values()}

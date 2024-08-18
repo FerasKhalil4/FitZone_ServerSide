@@ -1,10 +1,7 @@
 from rest_framework import serializers
-from .models import (Gym_Subscription, Branch_Sessions,Percentage_offer,
-                     Registration_Fee,
-                     ObjectHasPriceOffer,now)
-from .services import OfferSubscriptionService
+from .models import (Gym_Subscription, Branch_Sessions)
+from .services import OfferSubscriptionService,Activate_Gym_Training_Plan
 from gym.seriailizers import Registration_FeeSerializer
-
 
 class Client_BranchSerializer(serializers.ModelSerializer):
     
@@ -12,16 +9,22 @@ class Client_BranchSerializer(serializers.ModelSerializer):
     fee_data = Registration_FeeSerializer(source='registration_type',read_only=True)
     offer_code = serializers.CharField(write_only=True,allow_null=True)
     vouchers = serializers.ListField(write_only=True)
+    activate_gym_plan = serializers.BooleanField(write_only=True)
     class Meta:
         model = Gym_Subscription
-        fields = ['subscribtion_id','client','branch','registration_type','start_date','end_date','is_active',
+        fields = ['subscribtion_id','client','branch','registration_type','start_date','end_date',
+                  'is_active','activate_gym_plan',
                   'fee_data','price_offer','offer_code','vouchers']
         read_only_fields = ['subscribtion_id','is_active','end_date','start_date']
         
     def create(self, data):
         data = OfferSubscriptionService.offer_check(data)
-        instance = Gym_Subscription.objects.create(**data)
-        return instance
+        check_plan_activation = data.pop('activate_gym_plan',None)
+        if check_plan_activation :
+            Activate_Gym_Training_Plan.add_training_plan(data)
+        print('check')
+        
+        return Gym_Subscription.objects.create(**data)
     
     def update(self,instance,data):
 
@@ -38,8 +41,3 @@ class Branch_SessionsSerializer(serializers.ModelSerializer):
     class Meta: 
         model = Branch_Sessions
         fields = ['session_id','client','branch','created_at','start_date','end_date']
-        
-        
-    
-    
-        

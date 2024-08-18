@@ -9,5 +9,6 @@ urlpatterns = [
     path('workout/exercise-update/<int:workout_exercises_id>/',ExerciseWorkoutDetails,name='destoryExerciseWorkout'),
     path('training/client/<int:client_id>/',clientTrainingPlan, name='clientTrainingPlan'),
     path('training-details/client/<int:client_id>/',ClientTrainingPlanDetails,name='ClientTrainingPlanDetails'),
-    path('status/update/<int:client_plan_id>/',planstatus,name='planstatus')
+    path('status/update/<int:client_plan_id>/',planstatus,name='planstatus'),
+    # path('deactivate/',check_plans,name='deactivate plans')
 ]

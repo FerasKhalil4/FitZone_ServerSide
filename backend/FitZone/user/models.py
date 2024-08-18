@@ -5,7 +5,7 @@ import qrcode
 from io import BytesIO
 from django.core.files.base import ContentFile
 import datetime
-
+from django.core.exceptions import ValidationError
 class Client(models.Model):    
     user = models.OneToOneField(User, on_delete=models.CASCADE , related_name="client") 
     points = models.IntegerField(default=0)
@@ -153,7 +153,18 @@ class Goal (models.Model):
         self.protein_required = calculate_protein_requirement(weight, activity_level)
         self.fats_required = calculate_fat_requirement(self.calories_required)
         
+        
+    def clean(self):
+        if self.weight < self.goal_weight and self.goal == 'Lose Weight':
+            raise ValidationError("Weight cannot be less than goal weight for Lose Weight goal")
+        elif self.weight > self.goal_weight and self.goal == 'Gain Weight':
+            raise ValidationError("Weight cannot be more than goal weight for Gain Weight goal")
+        elif self.weight != self.goal_weight and self.goal == 'Maintain Weight':
+            raise ValidationError("Weight cannot be different from goal weight for Maintain Weight goal")
+            
+            
     def save(self, *args, **kwargs):
+        self.clean()
         if self.number_updates is None:
             self.number_updates = self.MAX_UPDATES
         self.calculate_nutritional_requirements()
