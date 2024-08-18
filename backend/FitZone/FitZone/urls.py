@@ -30,5 +30,11 @@ urlpatterns = [
     path('vouchers/',include('Vouchers.urls')), 
     path('offers/',include('offers.urls')),
     path('plans/',include('plans.urls')),
+    path('trainer/',include('trainer.urls')),
     path('wallet/',include('wallet.urls')),
+    path('disease/',include('disease.urls')),
+    path('nutrition/',include('nutrition.urls')),
+    path('chat/',include('chat.urls')),
+    path('gym_sessions/',include('gym_sessions.urls')),
+    
 ]+static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

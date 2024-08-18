@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+from celery.schedules import crontab
 import os
 
 
@@ -37,6 +38,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -44,11 +46,15 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     #external packages
+    'channels',
     'rest_framework',
     'rest_framework_simplejwt',
     'drf_spectacular',
     'corsheaders',
     'django_filters',
+    'django_celery_results',
+    'django_celery_beat',
+    
     #internal apps
     'classes',
     'community',
@@ -60,7 +66,12 @@ INSTALLED_APPS = [
     'Vouchers',
     'offers',
     'plans',
+    'trainer',
     'wallet',
+    'disease',
+    'nutrition',
+    'chat',
+    'gym_sessions',
 ]
 
 MIDDLEWARE = [
@@ -93,6 +104,8 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'FitZone.wsgi.application'
+ASGI_APPLICATION = 'FitZone.asgi.application'
+
 # CORS_URL_REGEX = r"^/api/.*" this is used to make sure that the requests only goes to the api/ endpoint
 if DEBUG:
     CORS_ALLOWED_ORIGINS =[
@@ -141,12 +154,11 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'UTC' 
 
 USE_I18N = True
 
-USE_TZ = True
-
+USE_TZ = True 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
@@ -156,6 +168,30 @@ STATIC_URL = 'static/'
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC' 
+
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+CELERY_BEAT_SCHEDULE = {
+    'deactivate_subs': {
+        'task': 'gym_sessions.tasks.deactivate_subs',
+        'schedule': crontab(minute=0, hour=0),
+    },
+    'deactivate_plans':{
+        'task': 'plans.tasks.deactivate_plans',
+        'schedule': crontab(minute=0, hour=1),
+    }
+}
+
+# celery -A FitZone beat --loglevel=info -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+# celery -A FitZone worker --pool=solo --loglevel=debug
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
@@ -164,6 +200,7 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend']
     }
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days = 5),
@@ -172,3 +209,9 @@ SIMPLE_JWT = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "FitZone"
     }
+
+CHANNEL_LAYERS = {
+    'default':{
+        'BACKEND':'channels.layers.InMemoryChannelLayer',
+    }
+}
