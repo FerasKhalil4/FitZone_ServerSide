@@ -6,9 +6,15 @@ from django.core.files.base import ContentFile
 from django.db.models import UniqueConstraint
 
 class Equipment(models.Model):
+    EQUIPMENT_CATEGORY = [
+        ('Cardio', 'Cardio'),
+        ('Equipment','Equipment'),
+        ('Free-Weights','Free-Weights')
+    ]
     name = models.CharField(max_length=100,unique=True)
     description = models.TextField()
     url = models.URLField(blank=True)
+    category = models.CharField(max_length=20,choices=EQUIPMENT_CATEGORY)
     qr_code_image = models.ImageField(upload_to='qr_codes', null=True, blank=True)
     image_path = models.ImageField(upload_to='image', null=True)
 

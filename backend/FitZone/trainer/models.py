@@ -134,11 +134,16 @@ class Client_Trainer(models.Model):
     registration_type = models.CharField(max_length=30,choices=REGISTRATION_TYPES)
     registration_status = models.CharField(max_length=20,default='pending', choices=REGISTRATION_STATUS)
     rejection_reason = models.CharField(max_length=100, null=True)
-    group = models.ForeignKey(TrainerGroups,on_delete=models.CASCADE, related_name="clients")
+    group = models.ForeignKey(TrainerGroups,on_delete=models.CASCADE, related_name="clients",null=True)
+    created_at = models.DateField(auto_now_add=True)
     class Meta:
         constraints = [
-            UniqueConstraint(fields=['client','trainer'],name='client_trainer_registration_status'
-                                ,condition=Q(start_date__lte = today,
-                                            end_date__gte = today,
-                            ))
+            UniqueConstraint(fields=['client'],name='client_trainer_registration_status'
+                                ,condition=Q(start_date__lte = datetime.datetime.now().date(),
+                                            end_date__gte = datetime.datetime.now().date(),
+                            ) & (
+                                Q(registration_status = 'accepted')
+                                | Q(registration_status = 'pending')
+                            )
+                                )
         ]

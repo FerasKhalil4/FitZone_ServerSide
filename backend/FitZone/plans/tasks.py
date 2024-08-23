@@ -4,6 +4,7 @@ from datetime import datetime
 from .models import Gym_plans_Clients,Client_Trianing_Plan
 from nutrition.models import NutritionPlan
 from django.core.exceptions import ValidationError
+
 @shared_task
 def deactivate_plans():
     try:

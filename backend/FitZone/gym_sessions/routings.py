@@ -1,6 +1,6 @@
-from django.urls import path
+from django.urls import re_path
 from .consumer import *
 
 ASGI_url_patterns =[
-    path('websocket/gym/<int:branch_id>/',gym_consumer,name='gym_consumer'),
+    re_path(r'websocket/gym/(?P<branch_id>\d+)/(?P<workout_id>\d+)?/?$',gym_consumer,name='gym_consumer'),
 ]

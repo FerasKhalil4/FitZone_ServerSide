@@ -82,7 +82,6 @@ class NewChatConsumer(BaseChatConsumer):
             data = {}
             
             self.receiver = self.scope.get('url_route').get('kwargs').get('user_id')
-            
             data['user_1'] = self.scope.get('user').pk
             data['user_2'] = self.receiver 
             

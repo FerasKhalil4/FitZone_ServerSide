@@ -2,10 +2,10 @@ from offers.models import ObjectHasPriceOffer,Percentage_offer
 from gym.models import Registration_Fee
 from wallet.models import Wallet, Wallet_Deposit
 from Vouchers.models import Redeem
-from plans.models import Gym_plans_Clients, Client_Trianing_Plan,Gym_Training_plans
+from plans.models import Gym_plans_Clients,Gym_Training_plans
 from datetime import datetime
 from django.core.exceptions import ValidationError
-
+import math
 
 now = datetime.now().date()
 
@@ -82,6 +82,19 @@ class OfferSubscriptionService:
 
 class SubscriptionService:
     
+    @staticmethod 
+    def client_points(client,points,flag=None):
+        
+        if flag :
+            
+            client.points -= points
+            client.save()
+
+        elif flag is None:
+            client.points += points
+            client.save()
+        
+            
     @staticmethod
     def check_client_balance(client, fee ,type_):
         
@@ -94,14 +107,13 @@ class SubscriptionService:
             else:
                 wallet.balance -= fee
                 wallet.save()
-                
+
                 Wallet_Deposit.objects.create(client=client
                                                   ,amount=fee
                                                   ,employee=None
                                                   ,tranasaction_type='cut')
                 
         elif type_ == 'add':
-            print('add money from clients balance')
             
             wallet.balance += fee
             wallet.save()
@@ -110,9 +122,8 @@ class SubscriptionService:
                                                 ,amount=fee
                                                 ,employee=None
                                                 ,tranasaction_type='retrieve')
-            
     
-class Activate_Gym_Training_Plan:
+class Activate_Gym_Training_PlanService:
     
     @staticmethod
     def add_training_plan(data):

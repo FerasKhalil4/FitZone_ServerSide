@@ -2,13 +2,13 @@ from django.db import models
 from .services import SubscriptionService
 from user.models import Client
 from gym.models import Branch, Registration_Fee
-from wallet.models import Wallet, Wallet_Deposit
-from offers.models import Percentage_offer, ObjectHasPriceOffer
+from points.models import Points
 from plans.models import Gym_plans_Clients
 from dateutil.relativedelta import relativedelta
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 import datetime
+import math
 
 now = datetime.datetime.now().date()
 
@@ -23,9 +23,24 @@ class Gym_Subscription(models.Model):
     update_at = models.DateTimeField(auto_now=True)
     price_offer = models.FloatField(null=True)
     
+    def get_product_points(self):
+        Purchasing_points = Points.objects.get(activity="Purchasing").points_percentage
+        first_time_points = Points.objects.get(activity="First Time Activity").points
+        check = Gym_Subscription.objects.filter(client=self.client)
+        print(first_time_points)
+        points = math.ceil(self.registration_type.fee / Purchasing_points) if Purchasing_points != 0 else 0
+        
+        if check.exists():
+            pass
+        else: 
+            points += first_time_points 
+            
+        return  points
     
     def check_registration_overlap(self)->None:
+        print(self.client)
         check = Gym_Subscription.objects.filter(client=self.client,start_date__lte=now,end_date__gte=now,is_active=True).exclude(id = self.id)
+        print(check)
         if check.exists():
             raise ValidationError('Client is already registered')
         
@@ -53,7 +68,7 @@ class Gym_Subscription(models.Model):
         check.update(is_active=False)
         
                
-    def check_registration_client_balance(self):
+    def check_registration_client_balance(self,points):
         
         if self.price_offer is None:
             fee = self.registration_type.fee
@@ -64,6 +79,7 @@ class Gym_Subscription(models.Model):
             self.branch.current_number_of_clients += 1
             self.branch.save()
             SubscriptionService.check_client_balance(self.client,fee,'cut')
+            SubscriptionService.client_points(self.client,points)
             
         else:
             instance = Gym_Subscription.objects.get(pk=self.pk)
@@ -88,6 +104,7 @@ class Gym_Subscription(models.Model):
                     
                     new_fee = fee - old_fee
                     SubscriptionService.check_client_balance(self.client,new_fee,'cut')
+                    SubscriptionService.client_points(self.client,points)
                     
             else:
                 print('allowed durations for update is available')
@@ -95,6 +112,8 @@ class Gym_Subscription(models.Model):
                     print('new fee is more then the existed fee')
                     new_fee = fee - old_fee
                     SubscriptionService.check_client_balance(self.client,new_fee,'cut')    
+                    SubscriptionService.client_points(self.client,points)
+                    
                 elif fee < old_fee :
                     print('new fee is more or equal to the existed fee')
                     if self.branch.gym.cut_percentage is not None:
@@ -102,7 +121,10 @@ class Gym_Subscription(models.Model):
                         SubscriptionService.check_client_balance(self.client,new_fee,'add')
                         
                         
+                        
+                        
     def allow_cancel(self) -> None:
+        points = self.get_product_points()
         if self.branch.gym.allowed_days_for_registraiton_cancellation != 0:
             print('check if the gym allows cancellation')
             self.allowed_date= now + relativedelta(days=self.branch.gym.allowed_days_for_registraiton_cancellation)
@@ -120,18 +142,25 @@ class Gym_Subscription(models.Model):
                 self.branch.save()
                 
                 if self.branch.gym.cut_percentage is not None:
+                    
                     print('check if the gym allows to retrieve money')
                     fee = self.registration_type.fee
                     retrieved_value = fee * (self.branch.gym.cut_percentage / 100)  
                     SubscriptionService.check_client_balance(self.client,retrieved_value,'add')  
+                SubscriptionService.client_points(self.client,points,flag=True)
+
+                    
                                          
 
     def clean(self)->None:
         super().clean()
         self.allowed_date= now + relativedelta(days=self.branch.gym.allowed_days_for_registraiton_cancellation)
+        points = self.get_product_points()
         print('check')
+        
         self.check_gym_capacity()
         print('check')
+        
         self.check_registration_branch()
         print('check')
         
@@ -141,7 +170,7 @@ class Gym_Subscription(models.Model):
         self.check_client_gym_trianing_plan()
         print('check')
         
-        self.check_registration_client_balance()
+        self.check_registration_client_balance(points)
         print('check')
         
         
@@ -179,4 +208,25 @@ class Branch_Sessions(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='sessions') 
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='clients_sessions')
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    def get_points(self):
+        print('get session points')
+        points = Points.objects.get(activity = 'Gym Sessions Points').points
+        SubscriptionService.client_points(self.client,points)
+        
+    def check_time(self):
+        print('check time')
+        if not Branch_Sessions.objects.filter(client=self.client,branch=self.branch).exists():
+            self.get_points()
+        else:
+            print('check failed')
+            pass 
+            
+    def clean(self) -> None:
+        super().clean()
+        self.check_time()
+        
+    def save(self,*args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
     

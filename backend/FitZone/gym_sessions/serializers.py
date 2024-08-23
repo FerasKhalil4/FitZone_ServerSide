@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import (Gym_Subscription, Branch_Sessions)
-from .services import OfferSubscriptionService,Activate_Gym_Training_Plan
+from .services import OfferSubscriptionService,Activate_Gym_Training_PlanService
 from gym.seriailizers import Registration_FeeSerializer
 
 class Client_BranchSerializer(serializers.ModelSerializer):
@@ -21,7 +21,7 @@ class Client_BranchSerializer(serializers.ModelSerializer):
         data = OfferSubscriptionService.offer_check(data)
         check_plan_activation = data.pop('activate_gym_plan',None)
         if check_plan_activation :
-            Activate_Gym_Training_Plan.add_training_plan(data)
+            Activate_Gym_Training_PlanService.add_training_plan(data)
         print('check')
         
         return Gym_Subscription.objects.create(**data)

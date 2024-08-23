@@ -16,9 +16,10 @@ class Equipment_ExerciseSerializer(serializers.ModelSerializer):
     video_path = serializers.FileField(required=False)
     exercise_details = ExerciseSerializer(source = "exercise",read_only=True )
     exercise = serializers.PrimaryKeyRelatedField(queryset = Exercise.objects.all(),write_only=True)
+    equipment_exercise_id = serializers.PrimaryKeyRelatedField(source='id', read_only=True)
     class Meta:
         model = Equipment_Exercise
-        fields = ['id','equipment','exercise','video_path','exercise_details','trainer']
+        fields = ['equipment_exercise_id','equipment','exercise','video_path','exercise_details','trainer']
         
 class EquipmentSerializer(serializers.ModelSerializer):
     exercise = Equipment_ExerciseSerializer(read_only=True,many = True)
@@ -27,7 +28,7 @@ class EquipmentSerializer(serializers.ModelSerializer):
     excerises = ExerciseSerializer(source = 'Equipment_Exercise.exercise',read_only=True,many = True)
     class Meta:
         model = Equipment
-        fields = ['equipment_id','name', 'description', 'url', 'qr_code_image','exercise','limitations','excerises','image_path']
+        fields = ['equipment_id','name', 'description', 'url', 'qr_code_image','exercise','limitations','excerises','image_path','category']
     
     def create(self,validated_data):
         request = self.context.get('request')

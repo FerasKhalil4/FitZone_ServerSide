@@ -11,10 +11,10 @@ from dateutil.relativedelta import relativedelta
 from plans.serializers import ClientTrainingSerializer,Client_Trianing_Plan,Gym_plans_ClientsSerializer,Gym_plans_Clients
 from django.db.models import Q
 from nutrition.serializers import NutritionPlan,NutritionPlanSerializer
-
+from wallet.models import Wallet, Wallet_Deposit
 class ClientsListAV(generics.ListAPIView):
     serializer_class = Client_TrainerSerializer
-    queryset = Client_Trainer.objects.all()
+    queryset = Client_Trainer.objects.filter(registration_status = 'pending')
     filter_backends = [DjangoFilterBackend]
     filterset_class = Client_TrainerFilter
     @extend_schema(
@@ -34,23 +34,11 @@ class ClientsListAV(generics.ListAPIView):
 clientlist = ClientsListAV.as_view()
 
 
-class ApproveClientsAV(generics.RetrieveUpdateAPIView):
+class ApproveClientsAV(generics.UpdateAPIView):
     serializer_class = Client_TrainerSerializer
-    queryset = Client_Trainer.objects.exclude(registration_status = 'rejected')
+    queryset = Client_Trainer.objects.filter(registration_status = 'pending')
 
-    @extend_schema(
-        summary = 'get specific pending client'
-    )
-    def get(self, request, *args, **kwargs):
-        try:
-            client = self.get_object()
-            user = request.user
-            trainer = Trainer.objects.get(employee__user = user)     
-            if trainer != client.trainer :
-                return Response({'error':'invalid client'}, status=status.HTTP_400_BAD_REQUEST)       
-            return Response(self.get_serializer(client).data , status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'error':str(e)},status = status.HTTP_400_BAD_REQUEST)
+        
     @extend_schema(
         summary = 'approve or reject specific pending client',
         examples=approve_client
@@ -60,20 +48,38 @@ class ApproveClientsAV(generics.RetrieveUpdateAPIView):
             with transaction.atomic():                
                 data=request.data
                 instance = self.get_object()
+                wallet = Wallet.objects.get(client_id=instance.client.pk) 
+                
+                
                 if instance.registration_status == 'accepted':
                     return Response({'error':'you cant update the status of this client'},status = status.HTTP_400_BAD_REQUEST)
+                
                 user = request.user
-                trainer = Trainer.objects.get(employee__user = user)     
+                trainer = Trainer.objects.get(employee__user = user)
+                
+                fee = trainer.private_training_price if data['registration_type'] == 'private' else trainer.online_training_price
                 
                 if trainer != instance.trainer :
                     return Response({'error':'invalid client'}, status=status.HTTP_400_BAD_REQUEST)   
-                if data['registration_status'] != 'rejected' and data['rejection_reason'] is not None:
-                    return Response({'error':'check on the rejection Note please'}, status=status.HTTP_400_BAD_REQUEST)
+                
+                if data['registration_status'] != 'rejected':
+                        wallet.balance += fee
+                        wallet.save()
+                        
+                        Wallet_Deposit.objects.create(
+                            client = instance.client.pk,
+                            amount = fee,
+                            tranasaction_type='retrieve'
+                        )
+                        
+                        return Response({'success':'client request rejected'}, status=status.HTTP_400_BAD_REQUEST)
+                
                 if data['registration_status'] != 'rejected':
                     start_date = datetime.datetime.now().date()
                     end_date = start_date + relativedelta(months=1)
                     data['start_date'] = start_date 
                     data['end_date'] = end_date
+
                 serializer = self.get_serializer(instance, data=data, partial=True)
                 serializer.is_valid(raise_exception=True)
                 serializer.save()

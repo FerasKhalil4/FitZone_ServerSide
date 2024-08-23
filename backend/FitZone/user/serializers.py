@@ -8,6 +8,13 @@ from django.urls import reverse
 from django.db.models import Q
 import datetime
 
+
+def get_instance_age(instance):
+        birth_date = instance.birth_date
+        today = date.today()
+        age = today.year - birth_date.year - ((today.month,today.day) < (birth_date.month,birth_date.day))
+        return age
+    
 class UserSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(max_length=100, write_only=True)
     age = serializers.SerializerMethodField(read_only=True)
@@ -24,14 +31,13 @@ class UserSerializer(serializers.ModelSerializer):
             'birth_date',
             'role',
             'age',
+            'first_name',
+            'last_name',
         ]
         
         
     def get_age(self , instance):
-        birth_date = instance.birth_date
-        today = date.today()
-        age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
-        return age
+        return get_instance_age(instance)
         
     def validate(self, data):
         password1 = data.get('password')
@@ -152,13 +158,21 @@ class ClientSerializer(serializers.ModelSerializer):
         ]
     
     def get_current_BMI(self, obj):
+        
         try:
             height = obj.height / 100
             goal = Goal.objects.get(client_id=obj.pk,status='Active')
             print(goal)
             if goal is not None :
                 weight = goal.weight
-            return weight / height ** 2
+                
+            bmi = weight / height ** 2
+            age = get_instance_age(obj.user)
+            fat_percentage = (1.201 * bmi) - (0.023  * age) - 10.8
+            return {
+                'BMI' : bmi,
+                'fat_percentage' : fat_percentage                
+            }
         except Goal.DoesNotExist:
             raise serializers.ValidationError({'error':'please provide weight'})
     
