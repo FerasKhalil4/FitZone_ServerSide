@@ -13,9 +13,6 @@ days_of_week = {
     7: 'saturday'
 }
 
-now = datetime.datetime.now()
-
-
 class Client_TrainerSerializer(serializers.ModelSerializer):
     Trainer_registration_id = serializers.PrimaryKeyRelatedField(source='id',read_only=True)
     client_details =serializers.SerializerMethodField()
@@ -69,14 +66,18 @@ class TrainerGroupsSerializer(serializers.ModelSerializer):
         try:
             clients_data = []
             clients = obj.clients.values()
+
             for client in clients:
-                client_ = Client.objects.get(pk=client['client_id'])
-                print(client_) 
-                clients_data.append({
-                    'pk':client_.pk,
-                    'username':client_.user.username,
-                    'name': f'{client_.user.first_name} {client_.user.last_name}'
-                })
+                if client['registration_status'] != 'accepted':
+                    pass
+                else:
+                    client_ = Client.objects.get(pk=client['client_id'])
+                    print(client_) 
+                    clients_data.append({
+                        'client_id':client_.pk,
+                        'username':client_.user.username,
+                        'name': f'{client_.user.first_name} {client_.user.last_name}'
+                    })
                 
             return clients_data
               
@@ -85,6 +86,7 @@ class TrainerGroupsSerializer(serializers.ModelSerializer):
        
         
     def get_current_group_capacity(self,obj):
+        now = datetime.datetime.now()
         capacity = Client_Trainer.objects.filter(group = obj.pk,start_date__lte = now,end_date__gte=now).count()
         return capacity
         
@@ -96,3 +98,4 @@ class TrainerGroupsSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         return super().create(validated_data)
+    

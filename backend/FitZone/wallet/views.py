@@ -3,8 +3,19 @@ from rest_framework.response import Response
 from .DataExample import *
 from .serializers import *
 from .models import Wallet
+from points.models import Points
 from drf_spectacular.utils import  extend_schema
 from django.db import transaction
+
+
+def Check_points_offer():
+    points = 0
+    check_first_time = Points.objects.get(activity = 'First Time Activity').points
+    check_wallet_refill = Points.objects.get(activity = 'Wallet Refill').points
+    points = check_first_time + check_wallet_refill
+    if points > 0 :
+        return points
+    return 0
 
 class WalletListAPIView(generics.ListAPIView):
     serializer_class = WalletSerializer
@@ -37,19 +48,25 @@ class WalletDetailsAV(generics.RetrieveUpdateAPIView):
     def put(self,request,*args, **kwargs):
         try:
             with transaction.atomic():
+                points = Check_points_offer()
                 data = request.data
                 if data['amount'] > 0 :
                     instance = self.get_object()
                     instance.balance = instance.balance + data['amount']
                     instance.save()
-                    
+                    client = Client.objects.get(id=instance.client.pk)
                     user = request.user
                     employee = Employee.objects.get(user__username = user)
+                    
                     deposit_data = {
                         'employee':employee.pk,
                         'amount':data['amount'],
-                        'client':instance.client.pk
+                        'client':instance.client.pk,
+                        'tranasaction_type':'add'
                     }
+                    client.points += points
+                    client.save()
+                    
                     deposit_serializer = DepositSerilaizer(data=deposit_data)
                     deposit_serializer.is_valid(raise_exception=True)
                     deposit_serializer.save()

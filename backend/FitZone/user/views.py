@@ -198,6 +198,7 @@ class LoginAV(APIView):
                     except Gym_Subscription.DoesNotExist:
                         pass
                     data['branch_id'] = client_current_sub.branch.pk if client_current_sub is not None else None
+                    data ['gym_id'] = client_current_sub.branch.gym.pk if client_current_sub is not None else None
                 refresh = RefreshToken.for_user(account)
                 
                 data['token'] = {'refresh_token':str(refresh) ,

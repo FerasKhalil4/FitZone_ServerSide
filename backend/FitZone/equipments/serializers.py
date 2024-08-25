@@ -3,7 +3,7 @@ from .models import *
 from django.contrib.sites.shortcuts import get_current_site
 from django.urls import reverse        
 from disease.serializers import LimitationsSerializer,DiseaseSerializer
-
+from django.db.models import Q
 
 class ExerciseSerializer(serializers.ModelSerializer):
     exercise_id = serializers.PrimaryKeyRelatedField(source='id',read_only=True)
@@ -22,13 +22,38 @@ class Equipment_ExerciseSerializer(serializers.ModelSerializer):
         fields = ['equipment_exercise_id','equipment','exercise','video_path','exercise_details','trainer']
         
 class EquipmentSerializer(serializers.ModelSerializer):
-    exercise = Equipment_ExerciseSerializer(read_only=True,many = True)
+    exercise = serializers.SerializerMethodField()
     limitations = LimitationsSerializer(source='diseases',read_only=True,many = True)
     equipment_id = serializers.PrimaryKeyRelatedField(source = 'id', read_only = True)
     excerises = ExerciseSerializer(source = 'Equipment_Exercise.exercise',read_only=True,many = True)
     class Meta:
         model = Equipment
         fields = ['equipment_id','name', 'description', 'url', 'qr_code_image','exercise','limitations','excerises','image_path','category']
+        
+    def get_exercise(self,obj):
+        try:
+            trainer = self.context.get('trainer', None)
+            query = Q(
+                    equipment = obj.pk
+                )
+            if trainer is not None:
+                query &= (Q( 
+                    trainer = None
+                    )
+                   |Q(
+                       trainer = trainer
+                   ))
+            else :
+                query &= Q(
+                     trainer = None
+                    )
+            
+            qs = Equipment_Exercise.objects.filter(query)
+
+            exercises = Equipment_ExerciseSerializer(qs,many=True).data
+            return exercises
+        except Exception as e:
+            raise serializers.ValidationError(str(e))
     
     def create(self,validated_data):
         request = self.context.get('request')
@@ -41,7 +66,7 @@ class EquipmentSerializer(serializers.ModelSerializer):
     
  
 class Diagrams_EquipmentsSerializer(serializers.ModelSerializer):
-    equipment_details = EquipmentSerializer(source ='equipment',read_only = True)
+    equipment_details = serializers.SerializerMethodField()
     equipment = serializers.PrimaryKeyRelatedField(queryset=Equipment.objects.all(), write_only=True)
     diagram = serializers.PrimaryKeyRelatedField(queryset=Diagram.objects.all(),write_only=True)
     Equipment_Diagram_id = serializers.PrimaryKeyRelatedField(source = 'id',read_only=True)
@@ -67,21 +92,30 @@ class Diagrams_EquipmentsSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError('This position is already taken')
             
         return data
+    
+    def get_equipment_details(self, obj):
         
+        try:
+            trainer = self.context.get('trainer',None)
+
+            equipments = Equipment.objects.get(pk=obj.equipment.pk) 
+            return EquipmentSerializer(equipments).data if trainer is None else EquipmentSerializer(equipments,context={'trainer':trainer}).data
+        except Exception as e:
+            raise serializers.ValidationError(str(e))
 
 class DiagramSerialzier(serializers.ModelSerializer):
-    equipment =  Diagrams_EquipmentsSerializer(read_only=True, many=True)
+    equipments =  serializers.SerializerMethodField()
     
     class Meta:
         model = Diagram
-        fields = ['id','floor','branch', 'equipment','height','width']
+        fields = ['id','floor','branch', 'equipments','height','width']
     
-    
-    def get_equipment(self,obj):
+    def get_equipments(self,obj):
         try:
             
-            equipments = Diagrams_Equipments.objects.filter(diagram=obj, is_deleted=False)
-            return Diagrams_EquipmentsSerializer(equipments,many=True).data
+            trainer = self.context.get('trainer',None)
+            equipments = Diagrams_Equipments.objects.filter(diagram=obj, is_deleted=False) 
+            return Diagrams_EquipmentsSerializer(equipments,many=True).data if trainer is None else Diagrams_EquipmentsSerializer(equipments,many=True,context={'trainer':trainer}).data 
         except Exception as e:
             raise serializers.ValidationError(str(e))
         

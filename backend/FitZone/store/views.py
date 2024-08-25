@@ -8,13 +8,14 @@ from .paginations import CustomPagination
 from django.db import transaction
 import json
 import math 
+from django.core.files.storage import default_storage
 
 class StoreMixin():
     
     def get_product_points(self,price):
-        activity = Points.objects.get(activity="Product points percentage").points_percentage
+        activity = Points.objects.get(activity="Purchasing").points_percentage
         return math.ceil(price / activity)
-        
+        # Purchasing
                 
     def category_data(self,serializer_category,product):
         serializer_category['amount'] = product.amount
@@ -120,6 +121,21 @@ class Branch_productListAV(StoreMixin,generics.ListAPIView):
     pagination_class = CustomPagination
     
     def get (self, request, pk, *args, **kwargs):
+        
+        try:
+            image_path = 'media/images/image_NsYzwF5.jpg'
+            try:
+                with open(image_path, 'rb') as f:
+                    image_data = f.read()
+                    print('----------------')
+            except UnicodeDecodeError as e:
+                # Handle the decoding error
+                print(f"UnicodeDecodeError: {e}")
+            except Exception as e:
+                # Handle other exceptions
+                print(f"Error: {e}")
+        except Exception as e:
+            return Response(str(e))
         try:
             branch_product = Branch_products.objects.filter(branch_id = pk).order_by('id')
             paginator = self.pagination_class()
@@ -128,33 +144,34 @@ class Branch_productListAV(StoreMixin,generics.ListAPIView):
             data_ = []
             
             for data in page:
-                print(data.product_type)
+                if data.image_path:
+                        image_path = str(data.image_path)
+                else :
+                    image_path = None
                 if data.product_type== 'Supplement':
                     supplement_ = Supplements.objects.get(id = data.product_id)
                     serializer = SupplementsSerializer(supplement_).data
                     branch_data = serializer.data
                     branch_data['branch_product_id'] = pk
-                    if branch_data['image_path'] is not None:
-                        branch_data['image_path'] = branch_data['image_path'].url
+
+                    branch_data['image_path'] = image_path
                     
                     branch_data = self.category_data(branch_data , data)
                     data_.append(branch_data)
                     
                 elif data.product_type=='Accessory':
-                    print(data.image_path)
                     accessory = Accessories.objects.get(id = data.product_id)
                     serializer = AccessoriesSerializer(accessory)
                     branch_data = serializer.data
                     branch_data['branch_product_id'] = pk
                     
                     branch_data = self.category_data(branch_data , data)
-                    if branch_data['image_path'] is not None:
-                        branch_data['image_path'] = branch_data['image_path'].url
+                    branch_data['image_path'] = image_path
+
                     data_.append(branch_data)
                     return paginator.get_paginated_response(data_)        
                     
                 elif data.product_type=='Meal':
-                    print(data.image_path)
                     meal = Meals.objects.get(id = data.product_id) 
                     serializer = MealsSerializer(meal)
                     branch_data = serializer.data
@@ -162,8 +179,8 @@ class Branch_productListAV(StoreMixin,generics.ListAPIView):
 
                     
                     branch_data = self.category_data(branch_data , data)
-                    if branch_data['image_path'] is not None:
-                        branch_data['image_path'] = branch_data['image_path'].url
+                    branch_data['image_path'] = image_path
+
                     data_.append(branch_data)  
             return paginator.get_paginated_response(data_)        
         except Exception as e: 
@@ -355,10 +372,3 @@ class CategoryProductsListAV(StoreMixin,generics.ListAPIView):
             return Response({"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
     
 CategoryProductsList = CategoryProductsListAV.as_view()
-
-
-""""Male: 9.99 x weight + 6.25 x height – 4.92 x age + 5
-Female: 9.99 x weight + 6.25 x height – 4.92 x age – 161
-According to the ACE, the Mifflin-St Jeor equation is more accurate than the Revised Harris-Benedict BMR equation.
-
-Other options"""

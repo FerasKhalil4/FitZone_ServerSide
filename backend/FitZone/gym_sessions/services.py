@@ -127,15 +127,19 @@ class Activate_Gym_Training_PlanService:
     
     @staticmethod
     def add_training_plan(data):
+        now = datetime.now().date()
         try:
             check_plan = Gym_Training_plans.objects.get(gym=data['branch'].gym)
         except Gym_Training_plans.DoesNotExist :
             return None 
-        
-        Gym_plans_Clients.objects.create(
-            client = data['client'],
-            gym_training_plan = check_plan,
-        )
-        
-        
-        
+        check = Gym_plans_Clients.objects.filter(start_date__lte = now,end_date__gte = now,client=data['client'])
+        check_validity = check.filter(gym=data['branch'].gym)
+        if check_validity.exists():
+            pass
+        else:
+            if check is not None:
+                check.update(is_active=False)
+            Gym_plans_Clients.objects.create(
+                client = data['client'],
+                gym_training_plan = check_plan,
+            )

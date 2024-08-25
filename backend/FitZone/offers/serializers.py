@@ -57,3 +57,13 @@ class OfferSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError('the start date and the end date must be more than the current date')
                 
             return data
+        
+class Price_offersStoreSerializer(serializers.ModelSerializer):
+    offer_id = serializers.PrimaryKeyRelatedField(source='id',read_only=True)
+    price_offer = PriceOfferSerializer(source = "price_offers",read_only=True)
+    
+    class Meta:
+        model = Offer
+        fields = [
+           'offer_id','start_date','end_date','branch','price_offer'
+        ]

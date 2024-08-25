@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import (Gym_Subscription, Branch_Sessions)
 from .services import OfferSubscriptionService,Activate_Gym_Training_PlanService
 from gym.seriailizers import Registration_FeeSerializer
+from equipments.serializers import DiagramSerialzier
 
 class Client_BranchSerializer(serializers.ModelSerializer):
     
@@ -41,3 +42,4 @@ class Branch_SessionsSerializer(serializers.ModelSerializer):
     class Meta: 
         model = Branch_Sessions
         fields = ['session_id','client','branch','created_at','start_date','end_date']
+        

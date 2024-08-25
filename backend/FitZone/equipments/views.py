@@ -53,8 +53,12 @@ class EquipmentExerciseListAV(ExercisesMixin,generics.ListCreateAPIView):
         try:
             with transaction.atomic():
                 user = request.user
-                equipments = request.data.pop('equipments')
+                data = request.data.dict()
+                equipment = json.loads(data.pop('equipment'))
+                video_path = data.pop('video_path',None)
+                
                 if 'exercise_id' in request.data:
+                    
                     exercise = Exercise.objects.get(id=request.data['exercise_id'])
                 elif 'exercise_id' not in request.data:
                     exercise_serialzier = ExerciseSerializer(data=request.data)
@@ -63,13 +67,12 @@ class EquipmentExerciseListAV(ExercisesMixin,generics.ListCreateAPIView):
                 else :
                     return Response({'error':'please provide a valid exercise data or exercise id'}, status=status.HTTP_400_BAD_REQUEST)
                 trainer = Trainer.objects.get(employee__user = user)
-                
-                for equipment in equipments:
-                    equipment['exercise'] = exercise.pk
-                    equipment['trainer'] = trainer.pk
-                    serializer = self.get_serializer(data=equipment)
-                    serializer.is_valid(raise_exception=True)
-                    serializer.save()
+                equipment['exercise'] = exercise.pk
+                equipment['trainer'] = trainer.pk
+                equipment['video_path'] = video_path
+                serializer = self.get_serializer(data=equipment)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
                 return Response({'success':'exercise created successfully'},status=status.HTTP_201_CREATED)                    
         except Exception as e:
             return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)   

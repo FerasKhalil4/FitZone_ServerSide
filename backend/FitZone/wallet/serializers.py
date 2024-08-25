@@ -14,7 +14,7 @@ class WalletSerializer(serializers.ModelSerializer):
 class DepositSerilaizer(serializers.ModelSerializer):
     class Meta:
         model = Wallet_Deposit
-        fields = ['id','employee','client','amount','transaction_type']
+        fields = ['id','employee','client','amount','tranasaction_type']
         
     def validate_amount(self, amount):
         if amount <= 0:

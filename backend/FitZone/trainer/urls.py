@@ -6,5 +6,7 @@ urlpatterns = [
     path('clients/<int:pk>/',approveClients, name='approveClients'),
     path('client/plan/<int:client_id>/',ClientTrainingPlanRetrieve,name='ClientTrainingPlanRetrieve'),
     path('groups/',trainerGroupsList,name='trainerGroupsList'),
-    path('groups/<int:pk>/',TrainerGroupsDetail,name='trainerGroups')
+    path('groups/<int:pk>/',TrainerGroupsDetail,name='trainerGroups'),
+    path('clients/details/<int:client_id>/',client_details,name='client_details'),
+    path('profile/',trainer_profile,name='trainer_profile'),
 ]

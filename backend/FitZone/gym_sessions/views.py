@@ -4,6 +4,9 @@ from rest_framework.decorators import api_view
 from .models import Gym_Subscription, Branch_Sessions, Client, ValidationError 
 from .serializers import Client_BranchSerializer
 from .DataExamples import *
+from equipments.models import Diagram,Equipment_Exercise
+from equipments.serializers import  DiagramSerialzier,Equipment_ExerciseSerializer
+from trainer.models import Client_Trainer
 from gym.models import Branch, Woman_Training_Hours
 from plans.models import Gym_plans_Clients, Client_Trianing_Plan, Workout
 from plans.serializers import WorkoutSerializer 
@@ -84,6 +87,7 @@ class SessionMixin():
         query = SessionMixin.get_query(client)
         today_number = datetime.now().day % 7 
         
+        
         gym_training_plan =Gym_plans_Clients.objects.filter(query)
         
         if gym_training_plan.exists():
@@ -130,7 +134,7 @@ def check_Session(request,*args, **kwargs):
                     client = Client.objects.get(user=request.user.pk)
                 except Client.DoesNotExist:
                     return Response({'error':'client does not exist'}, status=status.HTTP_400_BAD_REQUEST)
-                
+                print(client)
                 Branch_Sessions.objects.create(
                     client = client,
                     branch = branch,
@@ -205,7 +209,7 @@ class SubscribtionsDetailsAV(generics.RetrieveUpdateDestroyAPIView):
             return Response({'error': 'user is not registered in any gym'}, status=status.HTTP_400_BAD_REQUEST)
     @extend_schema(
         summary='update the current subscription',
-        examples=[]
+        examples=subscription
     )
     
     def put(self,request,*args, **kwargs):
@@ -231,3 +235,26 @@ class SubscribtionsDetailsAV(generics.RetrieveUpdateDestroyAPIView):
     
     
 subscribtion_details = SubscribtionsDetailsAV.as_view()
+
+class Diagram_Session(generics.ListAPIView):
+    serializer_class = DiagramSerialzier
+    queryset = Diagram.objects.all()
+    
+    @extend_schema(
+        summary='get the diagrams for client',
+    )
+    def get(self, request, *args, **kwargs):
+        
+        now = datetime.now().date()
+        client = Client.objects.get(user=request.user)
+        diagram =  Diagram.objects.filter(branch=kwargs['branch_id'])
+        
+        try:
+            trainer = Client_Trainer.objects.get(client=client,start_date__lte=now, end_date__gte=now,registration_status='accepted').trainer
+        except Client_Trainer.DoesNotExist:
+            trainer = None
+        data = self.get_serializer(diagram,many=True,context={'trainer':trainer}).data if trainer is not None\
+                                                        else self.get_serializer(diagram,many=True).data
+        return Response(data, status=status.HTTP_200_OK)
+    
+diagrams = Diagram_Session.as_view()        

@@ -457,15 +457,3 @@ class PlanUpdateStatusAV(generics.UpdateAPIView):
 planstatus = PlanUpdateStatusAV.as_view()
         
     
-# @extend_schema(
-#         summary='deactivate the expired plans'
-#     )
-# @api_view(['GET'])
-# def check_plans(request,*args, **kwargs):
-#     try:
-#         with transaction.atomic():
-#             deactivate_plans.delay()
-#             return Response({'success':'SUCCESS'},status=status.HTTP_200_OK)
-#     except Exception as e:
-#         return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
-    

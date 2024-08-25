@@ -6,6 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from .serialziers import *
 from .filters import Client_TrainerFilter
 from .DataExamples import *
+from gym.seriailizers import TrainerSerialzier,ShiftSerializer
 import datetime
 from dateutil.relativedelta import relativedelta
 from plans.serializers import ClientTrainingSerializer,Client_Trianing_Plan,Gym_plans_ClientsSerializer,Gym_plans_Clients
@@ -205,3 +206,50 @@ class TrainerGroupsDetailAV(generics.RetrieveUpdateDestroyAPIView):
         return super().delete(request, *args, **kwargs)
         
 TrainerGroupsDetail = TrainerGroupsDetailAV.as_view()
+
+class ClientDetailsAV(generics.RetrieveAPIView):
+    serializer_class =  Client_TrainerSerializer
+    queryset = Client_Trainer.objects.all()
+    
+    @extend_schema(
+        summary='get client details'
+    )
+    def get(self, request, *args, **kwargs):
+        print(kwargs)
+        print(kwargs['client_id'])
+        try:
+            try:
+                trainer = Trainer.objects.get(employee__user = request.user)
+            except Trainer.DoesNotExist:
+                return Response({'error':'trainer not found'}, status=status.HTTP_404_NOT_FOUND)
+            now =  datetime.datetime.now().date()
+            try:
+                instance = Client_Trainer.objects.get(client=kwargs['client_id'],trainer=trainer,start_date__lte = now, end_date__gte = now)
+            except Client_Trainer.DoesNotExist:
+                return Response({'error':'client not found for this trainer or training period'}, status=status.HTTP_404_NOT_FOUND)
+            
+            return Response(self.get_serializer(instance).data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
+client_details = ClientDetailsAV.as_view()
+
+class TrainerProfileAV(generics.RetrieveAPIView):
+    serializer_class = TrainerSerialzier
+    queryset = Trainer.objects.all()
+    
+    @extend_schema(
+        summary='get trainer profile'
+    )
+    def get(self, request, *args, **kwargs):
+        try:
+            obj = Trainer.objects.get(employee__user = request.user.pk)
+            shifts = Shifts.objects.filter(employee__user=request.user.pk,is_active=True)
+            return Response({
+                'profile_data':self.get_serializer(obj).data,
+                'shifts':ShiftSerializer(shifts,many=True).data
+                             }, status=status.HTTP_200_OK)
+        except Trainer.DoesNotExist:
+            return Response({'error':'trainer not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
+trainer_profile = TrainerProfileAV.as_view()

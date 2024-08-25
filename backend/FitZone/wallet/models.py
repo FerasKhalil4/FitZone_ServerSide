@@ -8,6 +8,7 @@ class Wallet(models.Model):
 
 class Wallet_Deposit(models.Model):
     CHOICES = [
+        ('add','add'),
         ('cut','cut'),
         ('retrieve','retrieve')
     ]
