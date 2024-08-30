@@ -13,7 +13,8 @@ urlpatterns = [
     path('trainer/<int:branch_id>/',trainerListAV , name = 'TrainerList'),
     path('shifts/<int:pk>/' , shiftCreateAV , name = 'shiftCreateAV'),
     path('shifts/update/<int:pk>/',shiftUpdateAV, name= 'shiftUpdateAV'),
-    path('fee/<int:gym_id>/',fee_list,name='fee_list')
+    path('fee/<int:gym_id>/',fee_list,name='fee_list'),
+    path('clients/',get_gyms_clients,name='get_gyms_clients'),
     
     
 ]

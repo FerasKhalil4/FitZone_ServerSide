@@ -74,8 +74,11 @@ class Branch_products(models.Model):
     points_gained = models.IntegerField(default=0)
     image_path = models.ImageField(upload_to='images/' , null = True)
     
+    
     class Meta:
         constraints = [
             UniqueConstraint(fields=('branch','product_id','product_type'), name='branch_product_constraint'),
         ]
     
+        
+        

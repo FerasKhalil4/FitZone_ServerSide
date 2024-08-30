@@ -4,8 +4,6 @@ from classes.models import Class_Scheduel
 from store.models import Branch_products, Category, Supplements_Category, Branch
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-import secrets
-import string
 from datetime import datetime
 class Offer(models.Model):
     name = models.CharField(max_length=60,blank=True)
@@ -26,21 +24,10 @@ class Percentage_offer(models.Model):
     supp_category = models.ForeignKey(Supplements_Category, on_delete=models.CASCADE, related_name="offer", null=True)
     fee = models.ForeignKey(Registration_Fee, on_delete=models.CASCADE, related_name='percentage_offers', null=True)
     class_id = models.ForeignKey(Class_Scheduel, on_delete=models.CASCADE, related_name='percentage_offers', null=True)
-    code = models.CharField(null=True)
     
-    def check_code(self,code):
-        now = datetime.now().date()
-        try:
-            check_old_code = Percentage_offer.objects.get(code=code,offer__end_date__lt=now)
-            
-            check_old_code.code = 'used'
-            check_old_code.save()
-            return True
-                
-        except Percentage_offer.DoesNotExist:
-            pass
+    def check_offer(self):
         
-        overlapped_query = Q(
+        overlapped_query = (Q(
             offer__start_date__lte = self.offer.start_date,
             offer__end_date__gt=self.offer.start_date,
         )|Q(
@@ -49,40 +36,45 @@ class Percentage_offer(models.Model):
         )|Q(
             offer__start_date__gte = self.offer.start_date,
             offer__end_date__lte=self.offer.end_date,
+        )) & Q(
+            offer__branch = self.offer.branch
         )
         
-        query = overlapped_query &Q(
-            code=code
-        )
+        category_query = overlapped_query &Q(
+            category = self.category,
+            category__isnull = False 
+        ) & (Q(
+                supp_category__isnull = True
+            ) | Q(
+                supp_category = self.supp_category,
+                )
+            )
         
-        return not Percentage_offer.objects.filter(query).exists()
+        query = category_query |Q(
+            fee = self.fee,
+            fee__isnull = False
+        ) | Q(
+            class_id = self.class_id,
+            class_id__isnull = False
+        )
+        if  Percentage_offer.objects.filter(query).exists():
+            raise ValidationError('you cannot create a Percentage offer now where this item already has an offer')
+        return 
 
-    
-        
-    def create_random(self,length):
-        characters = string.ascii_letters + string.digits
-        check = False
-        while check == False:
-            
-            code = ''.join(secrets.choice(characters) for _ in range(length))
-            check = self.check_code(code)
-        
-        return code
         
     def clean(self) -> None:
         super().clean()
         check = sum (attr is not None for attr in [self.category,self.class_id,self.fee])        
         if check != 1:
             raise ValidationError('the offer is supposed to be for one item')
-        if (self.category is None and self.supp_category is not None )or (self.category != 1 and self.supp_category is not None ) :
+        if (self.category is None and self.supp_category is not None )or (self.category.pk != 1 and self.supp_category is not None ) :
+            print(self.category != 1 and self.supp_category is not None)
             raise ValidationError('the offer for supp category should ne for category')
 
         
     def save(self,*args, **kwargs):
         self.clean()
-        
-        self.code = self.create_random(10)
-        
+        self.check_offer()
         super().save(*args, **kwargs)
  
 class Price_Offer(models.Model):

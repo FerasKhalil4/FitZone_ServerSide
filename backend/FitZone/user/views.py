@@ -192,6 +192,10 @@ class LoginAV(APIView):
                     client_current_sub = None
                     try:
                         client = Client.objects.get(user__pk =account.pk)
+                        goal = Goal.objects.filter(client=client,predicted_date__gte = datetime.datetime.now().date(),status='Active',is_deleted=False)
+                        if not goal.exists():
+                            data['goal_error'] = 'please add new goal to be tracked'
+                            
                         client_current_sub = Gym_Subscription.objects.get(client=client.pk, is_active=True)
                     except Client.DoesNotExist:
                         return Response({'error':'Account does not exist'},status=status.HTTP_400_BAD_REQUEST)

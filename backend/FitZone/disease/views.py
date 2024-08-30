@@ -23,25 +23,25 @@ class LimitationListAV(generics.ListCreateAPIView):
     serializer_class = LimitationsSerializer
     
     def get_queryset(self):
-        return Limitations.objects.filter(equipment = self.kwargs.get('equipment_pk'))
+        return Limitations.objects.filter(exercise = self.kwargs.get('exercise_id'))
  
     @extend_schema(
         summary='get the common pains and diseaeses related to specific equipment',
         examples=Diseases
     )
-    def post (self, request, equipment_pk, *args, **kwargs):
+    def post (self, request, exercise_id, *args, **kwargs):
         try:
             diseases = request.data['diseases']
             for disease in diseases:
                 disease_= {
                     'disease':disease,
-                    'equipment':equipment_pk
+                    'exercise':exercise_id
                 }
                 serializer = self.get_serializer(data=disease_)
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
                 
-            return Response({'success':'equipment limitations created successfully'}, status=status.HTTP_201_CREATED)
+            return Response({'success':'exercise limitations created successfully'}, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
         

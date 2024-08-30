@@ -4,8 +4,8 @@ from rest_framework.decorators import api_view
 from .models import Gym_Subscription, Branch_Sessions, Client, ValidationError 
 from .serializers import Client_BranchSerializer
 from .DataExamples import *
-from equipments.models import Diagram,Equipment_Exercise
-from equipments.serializers import  DiagramSerialzier,Equipment_ExerciseSerializer
+from equipments.models import Diagram
+from equipments.serializers import  DiagramSerialzier
 from trainer.models import Client_Trainer
 from gym.models import Branch, Woman_Training_Hours
 from plans.models import Gym_plans_Clients, Client_Trianing_Plan, Workout
@@ -87,7 +87,6 @@ class SessionMixin():
         query = SessionMixin.get_query(client)
         today_number = datetime.now().day % 7 
         
-        
         gym_training_plan =Gym_plans_Clients.objects.filter(query)
         
         if gym_training_plan.exists():
@@ -110,7 +109,22 @@ class SessionMixin():
         except :
             return None
             
+    @staticmethod 
+    def get_diagram(user,branch_id):
+        now = datetime.now().date()
+        client = Client.objects.get(user=user)
+        diagram =  Diagram.objects.filter(branch=branch_id)
+        
+        try:
+            trainer = Client_Trainer.objects.get(client=client,start_date__lte=now, end_date__gte=now,registration_status='accepted').trainer
+        except Client_Trainer.DoesNotExist:
+            trainer = None
             
+        data = DiagramSerialzier(diagram,many=True,context={'trainer':trainer}).data if trainer is not None\
+                                                else DiagramSerialzier(diagram,many=True).data
+                                                
+        return data
+    
             
 @api_view(['GET'])
 @extend_schema(
@@ -139,20 +153,20 @@ def check_Session(request,*args, **kwargs):
                     client = client,
                     branch = branch,
                 )
+                diagram = SessionMixin.get_diagram(request.user, kwargs['branch_id'])
                 
                 if branch.gym.allow_branches_access == False :
-                    
                     workout = SessionMixin.check_sub_one_branch_access(client,branch_id)
-                    
-                    if workout is not None:
-                        return Response({'workout':WorkoutSerializer(workout).data}, status=status.HTTP_200_OK)
-                    return Response({'success':'you can start your session now'}, status=status.HTTP_200_OK)
                     
                 else :
                     workout = SessionMixin.check_sub_multi_gym_access(client,branch)
-                    if workout is not None:
-                        return Response({'workout':WorkoutSerializer(workout).data}, status=status.HTTP_200_OK)
-                    return Response({'success':'you can start your session now'}, status=status.HTTP_200_OK)
+                    
+                if workout is not None:
+                    return Response({'workout':WorkoutSerializer(workout).data
+                                        ,'diagram':diagram
+                                        }, status=status.HTTP_200_OK)
+                return Response({'success':'you can start your session now',
+                                    'diagram':diagram}, status=status.HTTP_200_OK)
                                         
         except Exception as e:
             return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
@@ -257,4 +271,4 @@ class Diagram_Session(generics.ListAPIView):
                                                         else self.get_serializer(diagram,many=True).data
         return Response(data, status=status.HTTP_200_OK)
     
-diagrams = Diagram_Session.as_view()        
+diagrams = Diagram_Session.as_view()       

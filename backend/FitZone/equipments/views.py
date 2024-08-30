@@ -72,7 +72,15 @@ class EquipmentExerciseListAV(ExercisesMixin,generics.ListCreateAPIView):
                 equipment['video_path'] = video_path
                 serializer = self.get_serializer(data=equipment)
                 serializer.is_valid(raise_exception=True)
-                serializer.save()
+                equipment_exercise = serializer.save()
+                
+                for disease in json.loads(data['diseases']):
+                    limitation_data = {'disease':disease['id'], 'exercise':equipment_exercise.pk}
+                    limitation_serializer = LimitationsSerializer(data=limitation_data)
+                    if limitation_serializer.is_valid(raise_exception=True):
+                        limitation_serializer.save()
+                        
+                        print(limitation_serializer.data)
                 return Response({'success':'exercise created successfully'},status=status.HTTP_201_CREATED)                    
         except Exception as e:
             return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)   
@@ -120,11 +128,11 @@ class EquipmentsListAV(generics.ListCreateAPIView):
                 else:
                     relation_data['exercise_id'] =data.pop('exercise_id', None)
                     relation_data['video_path'] = video_path 
-                Equipment_Exercise.objects.create(**relation_data)
+                equipment_exercise = Equipment_Exercise.objects.create(**relation_data)
                 
                 for disease in data['diseases']:
 
-                    limitation_data = {'disease':disease['id'], 'equipment':equipment.pk}
+                    limitation_data = {'disease':disease['id'], 'exercise':equipment_exercise.pk}
                     limitation_serializer = LimitationsSerializer(data=limitation_data)
                     if limitation_serializer.is_valid(raise_exception=True):
                         limitation_serializer.save()

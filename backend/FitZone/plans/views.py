@@ -1,17 +1,14 @@
-from rest_framework.decorators import api_view
 from rest_framework import generics, status 
 from rest_framework.response import Response
 from .serializers import *
 from .DataExamples import * 
 from trainer.models import Client_Trainer
-from gym.models import Branch
-from nutrition.models import NutritionPlan
 from django.db import transaction
 from django.db.models import Q
 from drf_spectacular.utils import  extend_schema
 import datetime 
 from django.core.exceptions import ValidationError
-from .tasks import deactivate_plans
+from disease.models import Limitations
 
 class PlanMixin():
     def check_incompatibility(self,data):
@@ -42,28 +39,30 @@ class PlanMixin():
             raise ValidationError('wokouts must be 7')
         return True
     
-    def Create_Workouts(self,workouts,plan):
-        
+    def Create_Workouts(self,workouts,plan,client=None):
+            
         for i in range(len(workouts)):
-            name = workouts[i].get('name',None)
-            if name is None:
+            name = workouts[i]['name']
+            if len(name) == 0:
                 workouts[i]['name'] = 'Rest'
         self.check_workout(workouts)
         for workout in workouts:
             exercises = workout.pop('exercises',[])
+
             workout['training_plan'] = plan.pk
             self.check_incompatibility(workout)
             workout_serializer = WorkoutSerializer(data=workout)
             workout_serializer.is_valid(raise_exception=True)
             workout_instance = workout_serializer.save()
-            
             if workout_instance.name != 'Rest':
                 if exercises is not [] :
                     for exercise in exercises:
-                        exercise['workout'] = workout_instance.pk
                         
+                        exercise['workout'] = workout_instance.pk
+
                         exercise_serializer = Workout_ExercisesSerializer(data = exercise)
                         exercise_serializer.is_valid(raise_exception=True)
+                        
                         exercise_serializer.save()
                 else:
                     raise ValueError('please add the exercises for this plan')
@@ -389,10 +388,8 @@ class ClientTrainingPlanListAV(PlanMixin,generics.ListCreateAPIView):
                 client_plan_data = ClientTrainingSerializer(data=client_plan_data)
                 client_plan_data.is_valid(raise_exception=True)
                 client_plan_data.save()
-                print('0000000000')
                 
                 self.Create_Workouts(workouts, plan)
-                print('0000000000')
                 
                 return Response({'success': 'Trianing plan created successfully'},status=status.HTTP_201_CREATED)
                 

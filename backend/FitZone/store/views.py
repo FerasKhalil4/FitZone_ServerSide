@@ -129,10 +129,8 @@ class Branch_productListAV(StoreMixin,generics.ListAPIView):
                     image_data = f.read()
                     print('----------------')
             except UnicodeDecodeError as e:
-                # Handle the decoding error
                 print(f"UnicodeDecodeError: {e}")
             except Exception as e:
-                # Handle other exceptions
                 print(f"Error: {e}")
         except Exception as e:
             return Response(str(e))

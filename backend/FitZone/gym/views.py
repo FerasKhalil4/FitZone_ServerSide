@@ -331,10 +331,14 @@ class Registration_feeListAV(generics.ListAPIView):
     
 fee_list = Registration_feeListAV.as_view()
 
+class Get_Gym_Clients_listAV(generics.ListAPIView):
+    serializer_class = AvailableGymsSerializer
+    queryset = Gym.objects.filter(is_deleted=False)
+    
+    def get(self,request,*args, **kwargs):
+        try:
+            return Response(self.get_serializer(self.get_queryset(),many=True).data,status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)},status=status.HTTP_400_BAD_REQUEST)
 
-# check on the client registrarion and start session
-
-# class ClientSession(generics.CreateAPIView):
-#     serializer_class = 
-#     def post(self,request, *args, **kwargs):
-#         if 
+get_gyms_clients = Get_Gym_Clients_listAV.as_view()

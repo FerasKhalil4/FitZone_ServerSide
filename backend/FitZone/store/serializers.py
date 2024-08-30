@@ -331,6 +331,30 @@ class PublicStoreSerializer(serializers.ModelSerializer):
         fields = ['product_id', 'category','name', 'description','brand'
                   ,'brand','accessories','meals_','supplements_','product_branch_availability']
     
+    
+    def append_data(self,branch_data,instance,branch):
+        try:
+            if f'gym_{branch.branch.gym.pk}' not in branch_data[instance.pk]:
+                branch_data[instance.pk][f'gym_{branch.branch.gym.pk}'] = {
+                    'gym_name': branch.branch.gym.name,
+                    'gym_id' : branch.branch.gym.pk,
+                    'products_data' : [] 
+                }
+                
+            return branch_data[instance.pk][f'gym_{branch.branch.gym.pk}']['products_data'].append(
+                                    {
+                                    "branch_product_id":branch.pk,
+                                    'branch':branch.branch.pk,
+                                    'price':branch.price,
+                                    'image':str(branch.image_path),
+                                    'points_gained':branch.points_gained,
+                                    'branch_address': f"{branch.branch.city} - {branch.branch.street} - {branch.branch.address} " 
+                                        
+                                    }
+                                    )
+        except Exception as e:
+            raise serializers.ValidationError(str(e))
+                
     def get_product_branch_availability(self,obj):
 
         try:
@@ -342,18 +366,9 @@ class PublicStoreSerializer(serializers.ModelSerializer):
                                                             product_type = 'Supplement',
                                                             branch__gym__allow_public_products = True)
                     if len(branch_) > 0:
-                        branch_data[supplement.pk] = [] 
+                        branch_data[supplement.pk] = {}
                         for branch in branch_:
-                            branch_data[supplement.pk].append(
-                                                              {
-                                                                  'gym': branch.branch.gym.name,
-                                                                  'branch':branch.branch.pk,
-                                                                  'price':branch.price,
-                                                                  'image':str(branch.image_path),
-                                                                  'points_gained':branch.points_gained,
-                                                                  
-                                                              }
-                                                              )
+                            self.append_data(branch_data,supplement,branch)
                             
             if obj.category.pk == 2:
                 meals = Meals.objects.filter(product=obj.pk)
@@ -363,17 +378,10 @@ class PublicStoreSerializer(serializers.ModelSerializer):
                                                             branch__gym__allow_public_products = True
                                                             )
                     if len(branch_) > 0:
-                        branch_data[meal.pk] = [] 
+                        branch_data[meal.pk] =  {}
                         for branch in branch_:
-                            branch_data[meal.pk].append({
-                                                                  'gym': branch.branch.gym.name,
-                                                                  'branch':branch.branch.pk,
-                                                                  'price':branch.price,
-                                                                  'image':str(branch.image_path),
-                                                                  'points_gained':branch.points_gained,
-                                                                  
-                                                                  
-                                                              })
+                            self.append_data(branch_data,meal,branch)
+
             if obj.category.pk == 3:
                 accessories = Accessories.objects.filter(product=obj.pk)
                 for accessory in accessories:
@@ -382,97 +390,81 @@ class PublicStoreSerializer(serializers.ModelSerializer):
                                                             branch__gym__allow_public_products = True
                                                             )
                     if len(branch_) > 0:
-                        branch_data[accessory.pk] = [] 
+                        branch_data[accessory.pk] =  {} 
                         for branch in branch_:
-                            branch_data[accessory.pk].append({
-                                                                  'gym': branch.branch.gym.name,
-                                                                  'branch':branch.branch.pk,
-                                                                  'price':branch.price,
-                                                                  'image':str(branch.image_path),
-                                                                  'points_gained':branch.points_gained,
-                                                                  
-                                                              })
-                        
+                            self.append_data(branch_data,accessory,branch)
             return branch_data
                 
         except Exception as e:
             raise serializers.ValidationError(str(e))
-                
-        
+
 class PrivateStoreSerializer(serializers.ModelSerializer):
     products = serializers.SerializerMethodField()
 
     class Meta:
-        model = Gym
+        model = Product
         fields = ['products']
             
-            
-    def pop_data(self,data):
-        data['product'].pop('id',None)
-        data['product'].pop('category',None)
-        data['product'].pop('image_path',None)
-        data.pop('product_id',None)
-        return data
     
     
-    def get_retieved_data(self,instance,products_data,instance_data,product,product_type):
-        base_product_data = instance_data.pop('product')
-        
-        if instance.product.pk not in products_data[f'{product_type}']:
-            products_data[f'{product_type}'][instance.product.pk] = {
-            'details':base_product_data,
-            f'{product_type}_products':[]
-            }
-
-        products_data[f'{product_type}'][instance.product.pk][ f'{product_type}_products'].append({
-        'branch_product_id':product.pk,
-        'branch_product_details':instance_data,
-        'price':product.price,
-        'image_path':str(product.image_path),
-        'points_gained':product.points_gained,
-        'branch':product.branch.pk,
-        })
-        
-        return products_data
-        
-    def get_products_data(self,products):
-        products_data = {
-            'meal':{},
-            'accessory':{},
-            'supplement':{},
-            
+    def get_retieved_data(self,instance,instance_data):
+        instance.pop('product',None)
+        return {
+        'product_data':instance,
+        'branch_product_id':instance_data.pk,
+        'product_amount':instance_data.amount,
+        'price':instance_data.price,
+        'image_path':str(instance_data.image_path),
+        'points_gained':instance_data.points_gained,
+        'branch':instance_data.branch.pk,
+        'branch_address': f"{instance_data.branch.city} - {instance_data.branch.street} - {instance_data.branch.address}" 
         }
-        for product in products:
-            if product.product_type == 'Supplement':
-                
-                instance = Supplements.objects.get(pk=product.product_id)
-                instance_data = SupplementsSerializer(instance).data
-                instance_data = self.pop_data(instance_data)
-                products_data = self.get_retieved_data(instance,products_data,instance_data,product,'supplement')
-                
-                
-            elif product.product_type == 'Meal':
-                
-                instance =Meals.objects.get(pk=product.product_id)
-                instance_data = MealsSerializer(instance).data
-                instance_data = self.pop_data(instance_data)
-                products_data = self.get_retieved_data(instance,products_data,instance_data,product,'meal')
+        
+    def get_products_data(self,product,branch):
+        product_data = []
+        print(product.category.name)
 
-            elif product.product_type == 'Accessory':
+        if product.category.name == 'Supplement':
+            
+            supplements = Supplements.objects.filter(product=product.pk)
+            print(supplements)
+            for supplement in supplements:
+                try:
+                    serializer = SupplementsSerializer(supplement).data
+                    instance = Branch_products.objects.get(product_id = supplement.pk,branch=branch,is_available=True)
+                    product_data.append(self.get_retieved_data(serializer,instance))
+                except Branch_products.DoesNotExist:
+                    pass
+            
+            
+        elif product.category.name == 'Meal':
+            
+            meals =Meals.objects.filter(product=product.pk)
+            for meal in meals:
+                try:
+                    serializer = MealsSerializer(meal).data
+                    instance = Branch_products.objects.get(product_id = meal.pk,branch=branch,is_available=True)
+                    product_data.append(self.get_retieved_data(serializer,instance))
+                except Branch_products.DoesNotExist:
+                    pass
                 
-                instance = Accessories.objects.get(pk=product.product_id)
-                instance_data = AccessoriesSerializer(instance).data
-                instance_data = self.pop_data(instance_data)
-                products_data = self.get_retieved_data(instance,products_data,instance_data,product,'accessory')
+        elif product.category.name == 'Accessory':
+            
+            accessories = Accessories.objects.filter(product=product.pk)
+            for accessory in accessories:
+                try:
+                    serializer = AccessoriesSerializer(accessory).data
+                    instance = Branch_products.objects.get(product_id = accessory.pk,branch=branch,is_available=True)
+                    product_data.append(self.get_retieved_data(serializer,instance))
+                except Branch_products.DoesNotExist:
+                    pass
                 
-        return products_data
+        return product_data
     
     
     def get_products(self, obj):
         try:
-            # check_filtering = self.context.get('request').GET.get('product_type',None)
-            products = Branch_products.objects.filter(branch__gym=obj.pk,is_available=True) 
-            products_data = self.get_products_data(products)
+            products_data = self.get_products_data(obj,self.context.get('branch'))
             
             return products_data
             

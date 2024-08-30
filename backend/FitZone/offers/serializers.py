@@ -16,7 +16,7 @@ class PercentageOfferSerializer(serializers.ModelSerializer):
      
     class Meta:
         model = Percentage_offer
-        fields = ['percentage_id', 'offer_id', 'percentage_cut', 'class_id', 'fee', 'category', 'supp_category','class_data','fee_data','category_data','supp_category_data','code']
+        fields = ['percentage_id', 'offer_id', 'percentage_cut', 'class_id', 'fee', 'category', 'supp_category','class_data','fee_data','category_data','supp_category_data']
     def create(self, validated_data):
         validated_data['offer'] = validated_data['offer']['pk']
         instance = Percentage_offer.objects.create(**validated_data)

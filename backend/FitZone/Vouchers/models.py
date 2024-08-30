@@ -80,12 +80,12 @@ class Redeem(models.Model):
         
     def save(self, *args, **kwargs):
         self.clean()
-        if self.expired_date is None:
-            self.now = datetime.now().date()
-            self.expired_date = self.now + relativedelta(days=self.voucher.number_of_days)
-        self.code = self.create_random(10)
-        self.points_used = self.voucher.points_required
+        if not self:
+            if self.expired_date is None:
+                self.now = datetime.now().date()
+                self.expired_date = self.now + relativedelta(days=self.voucher.number_of_days)
+            self.code = self.create_random(10)
+            self.points_used = self.voucher.points_required
         
-
         super(Redeem, self).save(*args, **kwargs)
     

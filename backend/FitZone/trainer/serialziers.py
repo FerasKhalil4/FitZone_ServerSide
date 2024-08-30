@@ -24,11 +24,12 @@ class Client_TrainerSerializer(serializers.ModelSerializer):
         
     
     def validate(self,data):
-        if data['registration_type'] == 'private' and data['group'] is None:
-            raise serializers.ValidationError('incompatible data for registrations')
-        
-        elif data['registration_type'] == 'online' and data['group'] is not None:
-            raise serializers.ValidationError('incompatible data for registrations')
+        if 'registration_type' in data:
+            if data['registration_type'] == 'private' and data['group'] is None:
+                raise serializers.ValidationError('incompatible data for registrations')
+            
+            elif data['registration_type'] == 'online' and data['group'] is not None:
+                raise serializers.ValidationError('incompatible data for registrations')
         return data  
               
     def get_client_details(self,obj):
@@ -87,7 +88,7 @@ class TrainerGroupsSerializer(serializers.ModelSerializer):
         
     def get_current_group_capacity(self,obj):
         now = datetime.datetime.now()
-        capacity = Client_Trainer.objects.filter(group = obj.pk,start_date__lte = now,end_date__gte=now).count()
+        capacity = Client_Trainer.objects.filter(group = obj.pk,start_date__lte = now,end_date__gte=now,registration_status='accepted').count()
         return capacity
         
     def get_days(self, days):

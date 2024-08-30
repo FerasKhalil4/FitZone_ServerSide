@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, re_path
 from .views import *
 
 urlpatterns = [
@@ -10,5 +10,6 @@ urlpatterns = [
     path('price/products/<int:branch_id>/',productPriceOfferList,name ='feePriceOfferList'),
     path('percentage/<int:pk>/<int:branch_id>/',percentageDetails, name = 'percentageDetails'),
     path('price/<int:pk>/<int:branch_id>/',priceDetails, name = 'priceDetails'),
-    path('destroy/<int:pk>/<int:branch_id>/',destroyOffer, name ='destroyOffer'),  
+    path('destroy/<int:pk>/<int:branch_id>/',destroyOffer, name ='destroyOffer'), 
+    re_path(r'store/(?P<branch_id>\d+)?/?$',percentage_offer_store,name='percentage_offer_store'),
 ]

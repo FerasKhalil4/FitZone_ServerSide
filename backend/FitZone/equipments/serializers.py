@@ -97,7 +97,6 @@ class Diagrams_EquipmentsSerializer(serializers.ModelSerializer):
         
         try:
             trainer = self.context.get('trainer',None)
-
             equipments = Equipment.objects.get(pk=obj.equipment.pk) 
             return EquipmentSerializer(equipments).data if trainer is None else EquipmentSerializer(equipments,context={'trainer':trainer}).data
         except Exception as e:
@@ -119,15 +118,4 @@ class DiagramSerialzier(serializers.ModelSerializer):
         except Exception as e:
             raise serializers.ValidationError(str(e))
         
-
-class CreateEquipment(serializers.ModelSerializer):
-    equipment = EquipmentSerializer()
-    diseases = LimitationsSerializer(required=False,many=True)
-    exercises = ExerciseSerializer()
-    
-    class Meta:
-        model = Equipment
-        fields = ['equipment','diseases','exercises']
-    
-    def create(self, validated_data):
-        print(validated_data)
+        

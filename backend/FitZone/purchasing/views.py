@@ -1,37 +1,94 @@
 from rest_framework import generics,status
 from store.models import Product
-from store.serializers import PublicStoreSerializer,PrivateStoreSerializer
+from store.serializers import PublicStoreSerializer,PrivateStoreSerializer,ProductSerializer,SupplementsSerializer,AccessoriesSerializer,MealsSerializer
+from store.models import Branch_products,Supplements,Accessories,Meals
 from rest_framework.response import Response
+from .DataExamples import private_purchasing
+from .serializers import Private_Store_Purchase_Serializer, Public_Store_Purchase_Serializer
+from .models import Purchase
 from django.core.cache import cache
 from offers.models import Offer
 from gym.models import Branch ,Gym
 from offers.serializers import Price_offersStoreSerializer
 from drf_spectacular.utils import extend_schema
 from datetime import datetime
+from django.db import transaction
 
+
+
+def get_products(qs):
+    data = {}
+    for product in qs:
+        if product.product_type == 'Supplement':
+            supplement = Supplements.objects.filter(pk=product.product_id).first()
+            if supplement is not None:
+                if supplement.product.pk not in data:
+                    data[supplement.product.pk] = ProductSerializer(supplement.product).data
+                
+            
+        elif product.product_type == 'Accessory':
+            accessory = Accessories.objects.filter(pk=product.product_id).first()
+            if accessory is not None:
+                if accessory.product.pk not in data:
+                    data[accessory.product.pk] = ProductSerializer(accessory.product).data
+        
+        elif product.product_type == 'Meal':
+            meal = Meals.objects.filter(pk=product.product_id).first()
+            if meal is not None:
+                if meal.product.pk not in data:
+                    data[meal.product.pk] = ProductSerializer(meal.product).data
+                    
+    return data
 
 class PublicStoreListAV(generics.ListAPIView):
-    serializer_class = PublicStoreSerializer
-    queryset = Product.objects.filter(is_deleted=False)
+    serializer_class = ProductSerializer
     @extend_schema(
-        summary='get products for public store'
+        summary='get products for public store' 
     )
+    def get_queryset(self):
+        qs = Branch_products.objects.filter(branch__gym__allow_public_products=True,branch__has_store=True)
+        data = get_products(qs)
+        return data
+        
     def get(self,request,*args, **kwargs):
         cache_key = 'public_store_products'
         data = cache.get(cache_key)
         if not data:
             now = datetime.now().date()
-            offers_qs = Offer.objects.filter(price_offers__isnull=False,start_date__lte=now,end_date__gte=now,is_deleted=False)
+            offers_qs = Offer.objects.filter(price_offers__isnull=False,start_date__lte=now,end_date__gte=now,
+                                             is_deleted=False,branch__gym__allow_public_products=True,
+                                             price_offers__objects__fee__isnull=True)
             offers_data = Price_offersStoreSerializer(offers_qs,many=True).data
-            qs = self.get_queryset()
-            products_data = self.get_serializer(qs,many=True).data
+            products_data = self.get_queryset()
             data = {
                 'products':products_data,
                 'offers':offers_data
             }
             cache.set(cache_key,data,timeout=60*45)            
         return Response(data,status=status.HTTP_200_OK)  
+public_store = PublicStoreListAV.as_view()
 
+
+class Public_Product_DetailsRetrieveAV(generics.RetrieveAPIView):
+    serializer_class = PublicStoreSerializer
+    queryset = Product.objects.filter(is_deleted=False)
+    
+product_details = Public_Product_DetailsRetrieveAV.as_view()
+
+
+class Private_Product_DetailsRetrieveAV(generics.RetrieveAPIView):
+    serializer_class = PrivateStoreSerializer
+    queryset = Product.objects.filter(is_deleted=False)
+    
+    def get(self,request,*args, **kwargs):
+        try:
+            instance = Product.objects.get(id=self.kwargs['pk'])
+            serilaizer = self.get_serializer(instance,context={'branch':self.kwargs['branch_id']}).data
+            return Response(serilaizer,status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
+    
+private_product_details = Private_Product_DetailsRetrieveAV.as_view()
 
 def filtering_data(data,filtering):
     products = data.get('products').get('products').get(filtering)
@@ -41,17 +98,21 @@ def filtering_data(data,filtering):
     'offers':offers
                 }
     return data
-public_store = PublicStoreListAV.as_view()
 
 class PrivateStoreLisAV(generics.ListAPIView):
     serializer_class = PrivateStoreSerializer
-    queryset = Gym.objects.filter(is_deleted=False)
+    queryset = Branch.objects.filter(is_active=True)
+    
+    def get_queryset(self):
+        branch_id = self.kwargs.get('branch_id')
+        qs = Branch_products.objects.filter(branch=branch_id,branch__has_store=True)
+        data = get_products(qs)
+        return data
     
     def get(self,request,*args, **kwargs):
         try:
-            gym= Branch.objects.get(pk=kwargs['branch_id']).gym
-            
-            cache_key = f'private_store_products{gym.pk}'
+            branch= Branch.objects.get(pk=kwargs['branch_id'])
+            cache_key = f'private_store_products{branch.pk}'
             data = cache.get(cache_key)
             
             filtering = request.GET.get('product_type', None)
@@ -62,9 +123,10 @@ class PrivateStoreLisAV(generics.ListAPIView):
                 
             if not data:
                 now = datetime.now().date()
-                offers_qs = Offer.objects.filter(price_offers__isnull=False,branch=kwargs['branch_id'],start_date__lte=now,end_date__gte=now,is_deleted=False)
+                offers_qs = Offer.objects.filter(price_offers__isnull=False,branch=kwargs['branch_id'],start_date__lte=now,end_date__gte=now,
+                                                                is_deleted=False,price_offers__objects__fee__isnull=True)
                 offers_data = Price_offersStoreSerializer(offers_qs,many=True).data
-                products_data = self.get_serializer(gym).data
+                products_data = self.get_queryset()
                 data = {
                     'products':products_data,
                     'offers':offers_data
@@ -78,4 +140,33 @@ class PrivateStoreLisAV(generics.ListAPIView):
             return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
     
 private_store = PrivateStoreLisAV.as_view()
+
+class PurchasePrivateStoreAV(generics.CreateAPIView):
+    serializer_class = Private_Store_Purchase_Serializer
+    queryset = Purchase.objects.all()
     
+    @extend_schema(
+        summary='purchasing from private store',
+        examples=private_purchasing
+    )
+    def post(self, request, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                request.data['branch']=kwargs['branch_id']
+                return super().post(request, *args, **kwargs)
+        except Exception as e:
+            return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
+    
+purchase_private_store = PurchasePrivateStoreAV.as_view()
+
+class PurchasePublicStoreAV(generics.CreateAPIView):
+    serializer_class=Public_Store_Purchase_Serializer
+    queryset = Purchase.objects.all()
+    
+    def post(self, request, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                return super().post(request, *args, **kwargs)
+        except Exception as e:
+            return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
+purchase_public_store = PurchasePublicStoreAV.as_view()

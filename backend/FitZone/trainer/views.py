@@ -16,8 +16,6 @@ from wallet.models import Wallet, Wallet_Deposit
 class ClientsListAV(generics.ListAPIView):
     serializer_class = Client_TrainerSerializer
     queryset = Client_Trainer.objects.filter(registration_status = 'pending')
-    filter_backends = [DjangoFilterBackend]
-    filterset_class = Client_TrainerFilter
     @extend_schema(
             summary = 'get the clients registered with the trainer'
         )
@@ -52,30 +50,31 @@ class ApproveClientsAV(generics.UpdateAPIView):
                 wallet = Wallet.objects.get(client_id=instance.client.pk) 
                 
                 
-                if instance.registration_status == 'accepted':
+                if instance.registration_status == 'accepted' or instance.registration_status == 'rejected':
                     return Response({'error':'you cant update the status of this client'},status = status.HTTP_400_BAD_REQUEST)
+
                 
                 user = request.user
                 trainer = Trainer.objects.get(employee__user = user)
                 
-                fee = trainer.private_training_price if data['registration_type'] == 'private' else trainer.online_training_price
                 
                 if trainer != instance.trainer :
                     return Response({'error':'invalid client'}, status=status.HTTP_400_BAD_REQUEST)   
                 
-                if data['registration_status'] != 'rejected':
+                if data['registration_status'] == 'rejected':
+                        fee = trainer.private_training_price if instance.registration_type == 'private' else trainer.online_training_price
+                    
                         wallet.balance += fee
                         wallet.save()
-                        
+                        client = Client.objects.get(pk=instance.client.pk)
                         Wallet_Deposit.objects.create(
-                            client = instance.client.pk,
+                            client = client,
                             amount = fee,
                             tranasaction_type='retrieve'
                         )
                         
-                        return Response({'success':'client request rejected'}, status=status.HTTP_400_BAD_REQUEST)
                 
-                if data['registration_status'] != 'rejected':
+                elif data['registration_status'] != 'rejected':
                     start_date = datetime.datetime.now().date()
                     end_date = start_date + relativedelta(months=1)
                     data['start_date'] = start_date 

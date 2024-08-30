@@ -10,8 +10,7 @@ from django.core.exceptions import ValidationError
 class OffersMixin():
     
     def check_overlapping_offers(self,start_date,end_date, offer_category, offer_category_value,branch_id,offer = None, **kwargs):
-        
-        base_query = Q(
+        base_query = (Q(
                     start_date__lte = start_date,
                     end_date__gt = start_date,
                     ) | Q(
@@ -20,19 +19,21 @@ class OffersMixin():
                     ) | Q (
                         start_date__gt =start_date,
                         end_date__lt = end_date
-                    )
+                    ))
                     
         base_query &=  Q(is_deleted = False, branch=branch_id)
-      
         query = base_query & Q(**{f"percentage_offers__{offer_category}":offer_category_value })
                     
         for key , value in kwargs.items():
+            print(key)
             query &= Q(**{f"percentage_offers__{key}":value})
+        print('-------------------------------')
             
         if offer is not None : 
             check_overlap_offers =Offer.objects.filter(query).exclude(pk = offer.pk)
         else: 
             check_overlap_offers =Offer.objects.filter(query)
+            print('-------------------------------')
             
         if check_overlap_offers.exists():
             raise serializers.ValidationError('Overlap offers for the created offer')                             
@@ -99,6 +100,7 @@ class OffersMixin():
         elif 'category' in offer_detail:
             print(offer_detail)
             if 'supp_category' in offer_detail:
+
                 check = self.check_overlapping_offers(start_date, end_date,'category', offer_detail['category'],branch_id,supp_category = offer_detail['supp_category'])
             else:
                 check = self.check_overlapping_offers(start_date, end_date,'category', offer_detail['category'],branch_id)
@@ -281,7 +283,7 @@ class CategoryPercentageOfferListAV( OffersMixin , generics.ListCreateAPIView):
                 if data['offer_data']['category'] == 1 and  data['offer_data']['supp_category']!= 0 : 
                     supp_category = data['offer_data']['supp_category']
                     self.check_overlapping_offers(start_date,end_date,"category",data['offer_data']['category'],branch_id
-                                            ,percentage_offers__supp_category = supp_category)
+                                            ,supp_category = supp_category)
                 else:
                     
                     self.check_overlapping_offers(start_date,end_date,"category",data['offer_data']['category'],branch_id)
@@ -548,4 +550,43 @@ class DestroyOffersAV(generics.DestroyAPIView):
     serializer_class = OfferSerializer
 
 destroyOffer = DestroyOffersAV.as_view()
+
+
+class Percentage_Offer_Store_ListAV(generics.ListAPIView):
+    serializer_class = OfferSerializer
+    queryset = Offer.objects.all()
+    
+    @extend_schema(
+        summary="get percentage offers for the store",
+        description="you can send the branch_id to get the offers related to specific branch"
+        )
+    
+    def get(self,request,*args, **kwargs):
+        branch_id = kwargs.get('branch_id',None)
+        now = datetime.datetime.now().date()
+        query = Q(
+                start_date__lte = now,
+                end_date__gte = now,
+                is_deleted = False,
+                percentage_offers__category__isnull = False
+            )
+        if branch_id is not None:
+            query &= Q(
+                branch = branch_id
+            )
+        else:
+            query &= Q(
+                branch__gym__allow_public_products = True
+            )
+        sent_offers = []
+        offers = Offer.objects.filter(query).order_by('branch')
+        for offer in offers:
+            sent_offers.append(
+                {
+                    'offer_branch':offer.branch.pk,
+                    'offer_code':offer.percentage_offers.code
+                }
+            )
+        return Response(sent_offers,status=status.HTTP_200_OK)
         
+percentage_offer_store = Percentage_Offer_Store_ListAV.as_view()

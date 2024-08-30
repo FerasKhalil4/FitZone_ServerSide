@@ -2,7 +2,7 @@ from rest_framework import serializers
 from user.serializers import UserSerializer
 from user.models import User
 from .models import *
-from django.db.models import Q
+from django.db.models import Q, F
 from django.contrib.sites.shortcuts import get_current_site
 from django.urls import reverse    
 
@@ -27,7 +27,7 @@ class BranchSerializer(serializers.ModelSerializer):
     address = serializers.CharField(max_length=50)
     class Meta :
         model = Branch
-        fields = ['id','address' ,'city','street', 'has_store' , 'is_active','qr_code_image','url','number_of_clients_allowed','current_number_of_clients',]
+        fields = ['id','address' ,'city','street', 'has_store' , 'is_active','qr_code_image','url','number_of_clients_allowed','current_number_of_clients']
         
     def create(self, validated_data):
         request = self.context.get('request')
@@ -237,3 +237,19 @@ class TrainerSerialzier(serializers.ModelSerializer):
     class Meta:
         model = Trainer 
         fields= ['id','employee','employee_id','allow_public_posts','online_training_price','private_training_price']
+
+class AvailableGymsSerializer(serializers.ModelSerializer):
+    branches = serializers.SerializerMethodField()
+    fees = Registration_FeeSerializer(read_only=True,many=True)
+    woman_gym = WomanHoursSerializer(read_only=True, many = True, required=False)
+    
+    class Meta:
+        model = Gym
+        fields = ['name','description','image_path','branches','start_hour','close_hour','fees','woman_gym',]
+
+    def get_branches(self, obj):
+        return BranchSerializer(Branch.objects.filter(
+            gym=obj,
+            is_active=True,
+            number_of_clients_allowed__gt=F('current_number_of_clients')
+        ),many=True).data

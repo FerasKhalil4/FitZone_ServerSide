@@ -40,8 +40,11 @@ class OfferSubscriptionService:
         discount = 0
         for voucher in vouchers:
             try:
-                check = Redeem.objects.get(client=client,code=voucher,start_date__lte = now, expired_date__gte = now).voucher.discount
-                discount += check
+                check = Redeem.objects.get(client=client,code=voucher,start_date__lte = now, expired_date__gte = now)
+                if check.voucher.restrict_num_using >= check.times_used + 1:
+                    check.times_used += 1
+                    check.save()
+                    discount += check.voucher.discount
             except Redeem.DoesNotExist:
                 pass
 

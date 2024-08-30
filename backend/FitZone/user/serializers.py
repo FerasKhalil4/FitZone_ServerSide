@@ -158,7 +158,7 @@ class ClientSerializer(serializers.ModelSerializer):
         ]
     
     def get_current_BMI(self, obj):
-        
+
         try:
             height = obj.height / 100
             goal = Goal.objects.get(client_id=obj.pk,status='Active')

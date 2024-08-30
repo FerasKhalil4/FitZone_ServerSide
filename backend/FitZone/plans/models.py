@@ -78,21 +78,28 @@ class Workout_Exercises(models.Model):
         ]
     
     def check_equipment_limitaiotns(self):
-        
-        equipment_limitations = Limitations.objects.filter(equipment=self.exercise.equipment)
-        equipment_diseases = [limitations.disease.pk for limitations in equipment_limitations]
+        exercise_limitations = Limitations.objects.filter(exercise=self.exercise)
+        exercise_diseases = [limitations.disease.pk for limitations in exercise_limitations]
         client_diseases = Client_Disease.objects.filter(client=self.workout.training_plan.TrainersClientsPlans.client.pk,
-                                                        disease__in=equipment_diseases)
+                                                        disease__in=exercise_diseases).values_list('disease__name', flat=True)
+
+        diseases =f'{','.join([disease for disease in client_diseases])}' 
         if client_diseases.exists():
-            raise ValidationError(f'this client has disease {client_diseases.first().disease.name} he cant use this machine {self.exercise.equipment}')
-        
-        
+            raise ValidationError(f'this client has {diseases} he cant train this exercise {self.exercise.exercise.name} on {self.exercise.equipment.name}')
+
     def clean(self):
+        
         super().clean()
-        self.check_equipment_limitaiotns()
+        clients_plan = Client_Trianing_Plan.objects.filter(training_plan =self.workout.training_plan)
+        if clients_plan.exists():
+            self.check_equipment_limitaiotns()
+            
+         
+        
         
     def save(self, *args, **kwargs):
         self.clean()
+        
         super().save(*args, **kwargs)
     
 class Client_Trianing_Plan(models.Model):

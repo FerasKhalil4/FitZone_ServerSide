@@ -11,7 +11,7 @@ class LimitationsSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Limitations
-        fields = ['limitation_id','disease','equipment','diseases']
+        fields = ['limitation_id','disease','exercise','diseases']
         
         
 
