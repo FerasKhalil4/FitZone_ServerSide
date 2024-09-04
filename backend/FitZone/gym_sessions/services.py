@@ -23,14 +23,14 @@ class OfferSubscriptionService:
         except ObjectHasPriceOffer.DoesNotExist:
             return None
         
-    def check_percentage_offers(registration_type,code,branch):
+    def check_percentage_offers(registration_type,branch):
         try:
             percentage_offer_check = Percentage_offer.objects.get( fee=registration_type,
                                                                     offer__start_date__lte = now,
                                                                     offer__end_date__gte = now,
                                                                     offer__is_deleted = False,
                                                                     offer__branch = branch.pk
-                                                                    ,code=code) 
+                                                                    ) 
             
             return percentage_offer_check.percentage_cut
         except Percentage_offer.DoesNotExist:
@@ -52,7 +52,6 @@ class OfferSubscriptionService:
         
     @staticmethod
     def offer_check(data):
-        offer_code = data.pop('offer_code', None)
         vouchers = data.pop('vouchers',None)
         new_fee = None
         
@@ -65,12 +64,11 @@ class OfferSubscriptionService:
                 
         new_fee = new_fee if new_fee is not None else fee
         
-        if offer_code is not None:
             
-            offer_percentage = OfferSubscriptionService.check_percentage_offers(data['registration_type'], offer_code,data['branch'])
-            if offer_percentage is not None:
-                discount = new_fee * (offer_percentage / 100)
-                new_fee = new_fee - discount
+        offer_percentage = OfferSubscriptionService.check_percentage_offers(data['registration_type'],data['branch'])
+        if offer_percentage is not None:
+            discount = new_fee * (offer_percentage / 100)
+            new_fee = new_fee - discount
 
         
         if len(vouchers) != 0 :
@@ -126,18 +124,21 @@ class SubscriptionService:
                                                 ,employee=None
                                                 ,tranasaction_type='retrieve')
     
-class Activate_Gym_Training_PlanService:
+class Activate_Gym_Training_PlanService: 
     
     @staticmethod
     def add_training_plan(data):
         now = datetime.now().date()
         try:
+            print('create plann')
             check_plan = Gym_Training_plans.objects.get(gym=data['branch'].gym)
+            print('create plann')
         except Gym_Training_plans.DoesNotExist :
             return None 
         check = Gym_plans_Clients.objects.filter(start_date__lte = now,end_date__gte = now,client=data['client'])
-        check_validity = check.filter(gym=data['branch'].gym)
+        check_validity = check.filter(gym_training_plan__gym=data['branch'].gym)
         if check_validity.exists():
+            print('hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh')
             pass
         else:
             if check is not None:

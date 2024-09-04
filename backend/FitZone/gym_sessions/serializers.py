@@ -8,14 +8,13 @@ class Client_BranchSerializer(serializers.ModelSerializer):
     
     subscribtion_id = serializers.PrimaryKeyRelatedField(source='id',read_only=True)
     fee_data = Registration_FeeSerializer(source='registration_type',read_only=True)
-    offer_code = serializers.CharField(write_only=True,allow_null=True)
     vouchers = serializers.ListField(write_only=True)
     activate_gym_plan = serializers.BooleanField(write_only=True)
     class Meta:
         model = Gym_Subscription
         fields = ['subscribtion_id','client','branch','registration_type','start_date','end_date',
                   'is_active','activate_gym_plan',
-                  'fee_data','price_offer','offer_code','vouchers']
+                  'fee_data','price_offer','vouchers']
         read_only_fields = ['subscribtion_id','is_active','end_date','start_date']
         
     def create(self, data):

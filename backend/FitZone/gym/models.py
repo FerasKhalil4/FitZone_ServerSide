@@ -22,6 +22,7 @@ class Gym(models.Model):
     allow_public_products = models.BooleanField(default=True)
     allowed_days_for_registraiton_cancellation = models.IntegerField(default=0)
     allow_branches_access = models.BooleanField(default=False)
+    allowed_number_for_update = models.IntegerField(default=0)
 
     def __str__(self) -> str:
         return f"{self.id}:{self.name}"

@@ -20,9 +20,7 @@ private_purchasing = [
 			"amount":2
 		}
 	],
-	"offer_code":[
-     "ApSNgla84waapi"
-	],
+
 	"price_offers":[
 		{
 			"offer_id":8,
@@ -74,24 +72,7 @@ public_purchasing = [
 
 	],
 
-	"price_offers":[
-		{
-			"offer_id":8,
-		"amount":4,
-			"branch_id":1
-			
 
-		},
-		{
-			"offer_id":9,
-		"amount":4,
-			"branch_id":1
-			
-
-		}
-		
-		
-	],
 	"vouchers":[
 		"ApSNgla84w"
 	]

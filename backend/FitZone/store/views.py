@@ -20,9 +20,10 @@ class StoreMixin():
     def category_data(self,serializer_category,product):
         serializer_category['amount'] = product.amount
         serializer_category['price'] = product.price
-        serializer_category['image_path'] = product.image_path or None
+        serializer_category['image_path'] = str(product.image_path) or ""
         serializer_category['is_available'] = product.is_available
         serializer_category['branch_product_id'] = product.pk
+        
         return serializer_category
      
     def create_branch_product(self, details, branch_id, instance, product_type):
@@ -81,7 +82,7 @@ class ProductListAV(generics.ListAPIView):
     
 ProductList = ProductListAV.as_view()
 
-class ProductDetailsAV(generics.RetrieveUpdateAPIView):
+class ProductDetailsAV(generics.RetrieveUpdateDestroyAPIView):
     queryset = Branch_products.objects.filter(is_available= True)
     serializer_class = Branch_productSerializer
     
@@ -101,7 +102,6 @@ class ProductDetailsAV(generics.RetrieveUpdateAPIView):
         try:
             with transaction.atomic():
                 object_ = self.get_object()
-                
                 serializer = self.get_serializer(object_, data=request.data, partial=True)
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
@@ -123,64 +123,61 @@ class Branch_productListAV(StoreMixin,generics.ListAPIView):
     def get (self, request, pk, *args, **kwargs):
         
         try:
-            image_path = 'media/images/image_NsYzwF5.jpg'
-            try:
-                with open(image_path, 'rb') as f:
-                    image_data = f.read()
-                    print('----------------')
-            except UnicodeDecodeError as e:
-                print(f"UnicodeDecodeError: {e}")
-            except Exception as e:
-                print(f"Error: {e}")
-        except Exception as e:
-            return Response(str(e))
-        try:
             branch_product = Branch_products.objects.filter(branch_id = pk).order_by('id')
-            paginator = self.pagination_class()
-            page = paginator.paginate_queryset(branch_product,request)
+            # paginator = self.pagination_class()
+            # page = paginator.paginate_queryset(branch_product,request)
 
             data_ = []
             
-            for data in page:
-                if data.image_path:
-                        image_path = str(data.image_path)
-                else :
-                    image_path = None
+            for data in branch_product:
+                print(data.product_type)
                 if data.product_type== 'Supplement':
+                    print('start')
                     supplement_ = Supplements.objects.get(id = data.product_id)
-                    serializer = SupplementsSerializer(supplement_).data
-                    branch_data = serializer.data
-                    branch_data['branch_product_id'] = pk
-
-                    branch_data['image_path'] = image_path
                     
+                    serializer = SupplementsSerializer(supplement_)
+                    
+                    branch_data = serializer.data
+                    
+                    branch_data['branch_product_id'] = pk
+                    # branch_data['image_path'] = image_path
+                    print(branch_data)
+                    # print(str(branch_data['image_path']))
+                    # branch_data['image_path'] = str(branch_data['image_path'])
                     branch_data = self.category_data(branch_data , data)
                     data_.append(branch_data)
+                    print('end')
                     
                 elif data.product_type=='Accessory':
+                    
                     accessory = Accessories.objects.get(id = data.product_id)
                     serializer = AccessoriesSerializer(accessory)
                     branch_data = serializer.data
                     branch_data['branch_product_id'] = pk
+                    # branch_data['image_path'] = str(branch_data['image_path'])
                     
                     branch_data = self.category_data(branch_data , data)
-                    branch_data['image_path'] = image_path
+                    # branch_data['image_path'] = image_path
 
                     data_.append(branch_data)
-                    return paginator.get_paginated_response(data_)        
+                    # return paginator.get_paginated_response(data_)        
                     
                 elif data.product_type=='Meal':
+                    
                     meal = Meals.objects.get(id = data.product_id) 
                     serializer = MealsSerializer(meal)
                     branch_data = serializer.data
                     branch_data['branch_product_id'] = pk
+                    print(branch_data)
+                    # branch_data['image_path'] = str(branch_data['image_path'])
 
                     
                     branch_data = self.category_data(branch_data , data)
-                    branch_data['image_path'] = image_path
+                    # branch_data['image_path'] = image_path
 
                     data_.append(branch_data)  
-            return paginator.get_paginated_response(data_)        
+            print(data_)
+            return Response (data_,status=status.HTTP_200_OK)        
         except Exception as e: 
             return Response({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
 Branch_productList = Branch_productListAV.as_view()
@@ -222,7 +219,6 @@ class AccessoriesListAV(StoreMixin,generics.ListCreateAPIView):
                             details['amount'] = item['amount']
                             self.create_branch_product(details, branch_id, instance, 'Accessory')
                     
-                                        
 
                 return Response({"message": "Accessories processed successfully."}, status=status.HTTP_201_CREATED)
 
@@ -334,15 +330,16 @@ class CategoryProductsListAV(StoreMixin,generics.ListAPIView):
                     supplemetns = Supplements.objects.get(pk=product.product_id)
                     serializer_category = SupplementsSerializer(supplemetns).data     
                     serializer_category = self.category_data(serializer_category , product)
-                    print(serializer_category)
-                    
+                    serializer_category['image_path'] = str(serializer_category['image_path'])
                     data_retrieved.append(serializer_category)
+                    
                 return paginator.get_paginated_response(data_retrieved)
             elif category.name == 'Accessory':
                 for product in page:
                     accessories = Accessories.objects.get(pk=product.product_id)
                     serializer_category = AccessoriesSerializer(accessories).data
                     serializer_category = self.category_data(serializer_category , product)
+                    serializer_category['image_path'] = str(serializer_category['image_path'])
                     data_retrieved.append(serializer_category)
                     
                 return paginator.get_paginated_response(data_retrieved)
@@ -351,6 +348,7 @@ class CategoryProductsListAV(StoreMixin,generics.ListAPIView):
                     meals = Meals.objects.get(pk=product.product_id)
                     serializer_category = MealsSerializer(meals).data
                     serializer_category = self.category_data(serializer_category , product)
+                    serializer_category['image_path'] = str(serializer_category['image_path'])
                     data_retrieved.append(serializer_category)
                 return paginator.get_paginated_response(data_retrieved)
             

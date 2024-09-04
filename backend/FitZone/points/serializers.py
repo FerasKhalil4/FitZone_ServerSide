@@ -6,7 +6,7 @@ class PointsSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(read_only=True)
     class Meta:
         model = Points
-        fields = ['user','activity','points']
+        fields = ['user','activity','points','points_percentage']
         
         def validate_points(self,data):
             if data < 0:

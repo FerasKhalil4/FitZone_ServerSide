@@ -422,12 +422,10 @@ class PrivateStoreSerializer(serializers.ModelSerializer):
         
     def get_products_data(self,product,branch):
         product_data = []
-        print(product.category.name)
 
         if product.category.name == 'Supplement':
             
             supplements = Supplements.objects.filter(product=product.pk)
-            print(supplements)
             for supplement in supplements:
                 try:
                     serializer = SupplementsSerializer(supplement).data

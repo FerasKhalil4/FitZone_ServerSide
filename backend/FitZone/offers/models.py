@@ -3,7 +3,7 @@ from gym.models import Registration_Fee
 from classes.models import Class_Scheduel
 from store.models import Branch_products, Category, Supplements_Category, Branch
 from django.core.exceptions import ValidationError
-from django.db.models import Q
+from django.db.models import Q,UniqueConstraint
 from datetime import datetime
 class Offer(models.Model):
     name = models.CharField(max_length=60,blank=True)
@@ -97,5 +97,9 @@ class ObjectHasPriceOffer(models.Model):
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
-        
+    
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields = ('product','offer'),name='product_offer_constraint')
+        ]
     

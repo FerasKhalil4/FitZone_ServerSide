@@ -28,6 +28,7 @@ class Gym_plans_Clients(models.Model):
     is_active = models.BooleanField(default=True)
         
     def save(self,*args, **kwargs):
+        print('in model')
         if self.end_date is None:
             self.end_date = datetime.now().date() + relativedelta(weeks=self.gym_training_plan.plan_duration_weeks)
         super().save(*args, **kwargs)           

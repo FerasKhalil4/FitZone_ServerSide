@@ -92,7 +92,7 @@ class GymSerializer(serializers.ModelSerializer):
     class Meta:
         model = Gym
         fields =['id','allow_public_posts','allow_public_posts','name' , 'description','image_path',
-                 'created_at','start_hour','close_hour' ,'mid_day_hour','manager',
+                 'created_at','start_hour','close_hour' ,'mid_day_hour','manager','allowed_number_for_update',
                  'manager_id','manager_details','branch','woman_gym','woman_hours','allow_branches_access','branch_data',
                  'allow_retrival', 'duration_allowed', 'cut_percentage','fees','allowed_days_for_registraiton_cancellation']   
         

@@ -1,3 +1,4 @@
+from typing import Any
 from django.db import models
 from gym.models import Branch
 from django.db.models import UniqueConstraint
@@ -73,6 +74,11 @@ class Branch_products(models.Model):
     price = models.FloatField(default=0.0)
     points_gained = models.IntegerField(default=0)
     image_path = models.ImageField(upload_to='images/' , null = True)
+    
+    def delete(self, *args, **kwargs):
+        if self:
+            self.is_available = False
+            self.save()
     
     
     class Meta:
