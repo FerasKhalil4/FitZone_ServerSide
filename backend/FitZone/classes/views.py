@@ -1,15 +1,18 @@
 from rest_framework import generics, status ,serializers
 from rest_framework.response import Response
 from .models import *
+from .services import DeleteRegistrationService
 from .serializers import *
 from wallet.models import Wallet, Wallet_Deposit
 from points.models import Points
 import math, datetime
+from dateutil.relativedelta import relativedelta
 from django.db import transaction
 import json
+from drf_spectacular.utils import extend_schema
 def get_product_points(price):
-    activity = Points.objects.get(activity="Product points percentage").points_percentage
-    return math.ceil(price / activity)
+    activity = Points.objects.get(activity="Purchasing").points_percentage
+    return (int(price) // activity)
 
 class ClassesListAV(generics.ListCreateAPIView):
     serializer_class = ClassesSerializer
@@ -39,6 +42,8 @@ class ClassesListAV(generics.ListCreateAPIView):
                                     return Response({"error": "Invalid format for schedule"}, status=status.HTTP_400_BAD_REQUEST)
                         
                         data['schedule'] = schedule_data
+                        data['points'] = get_product_points(data['registration_fee'])
+                        print(data)
                         serializer = CreateClassSerializer(data=data,context = {'request':request,'branch_id':branch_id})
                         if serializer.is_valid(raise_exception=True):
                             serializer.save()
@@ -77,7 +82,7 @@ class ClassesDetailAV(generics.RetrieveUpdateDestroyAPIView):
                 clients_to_refund = []
                 
                 for schedule in class_scheduel:
-                    enrolled_clients = Client_Class.objects.filter(class_id = schedule.pk)
+                    enrolled_clients = Client_Class.objects.filter(class_id = schedule.pk,is_deleted=False)
                     if len(enrolled_clients) >= (math.ceil(schedule.allowed_number_for_class / 2)):
                         Flag = False
                         break 
@@ -128,7 +133,7 @@ class ClassScheduleListAV(generics.ListCreateAPIView):
         try:
             class_id = kwargs.get('pk')
             current_date = datetime.datetime.now().date()
-            qs = Class_Scheduel.objects.filter(class_id = class_id , start_date__lte = current_date , end_date__gte = current_date)
+            qs = Class_Scheduel.objects.filter(class_id = class_id ,  end_date__gte = current_date)
             serializer = self.get_serializer(qs,many=True)
             qs = serializer.data
             return Response({'data':qs}, status=status.HTTP_200_OK)
@@ -166,7 +171,7 @@ class ClassScheduleDetailsAv(generics.RetrieveUpdateDestroyAPIView):
             
             if 'hall' in data or 'start_date' in data or 'end_date' in data or 'start_time' in data or 'end_time' in data or 'trainer_id' in data:
                
-                check = Client_Class.objects.filter(pk = schedule_instance.pk)
+                check = Client_Class.objects.filter(pk = schedule_instance.pk,is_deleted=False)
               
                 if len(check) > (schedule_instance.allowed_number_for_class / 2):
                     return Response({'message':'sechdule Cant be Updated there is clients already Booked at this time'}) 
@@ -194,7 +199,7 @@ class ClassScheduleDetailsAv(generics.RetrieveUpdateDestroyAPIView):
             with transaction.atomic():
                 schedule_instance = self.get_object()
                 class_ = Classes.objects.get(pk = schedule_instance.class_id.pk)
-                check = Client_Class.objects.filter(pk = schedule_instance.pk)
+                check = Client_Class.objects.filter(pk = schedule_instance.pk,is_deleted=False)
                 employee = Employee.objects.get(user=request.user.pk)
                 cut_percentage = Branch.objects.get(pk=class_.branch.pk).gym.cut_percentage
                 
@@ -229,6 +234,90 @@ class ClassScheduleDetailsAv(generics.RetrieveUpdateDestroyAPIView):
             return Response({'error':str(e)})
 Class_ScheduleDetails = ClassScheduleDetailsAv.as_view()
 
+
+class ClassesAvailableListAV(generics.ListAPIView):
+    serializer_class = ClientClassesSerializer
+    @extend_schema(
+        summary='get the classes for the client to register'
+    )
+    def get_queryset(self):
+        qs = Classes.objects.filter(is_deleted=False,branch=self.kwargs['branch_id'])
+        return qs
+    
+client_classes = ClassesAvailableListAV.as_view()
+
         
+class ClientRegistrationListAV(generics.ListCreateAPIView):
+
+    
+    serializer_class = ClassRegisterSerializer
+    
+    def get_queryset(self):
+        qs = Client_Class.objects.filter(client__user = self.request.user.pk,is_deleted=False)
+        return qs
+        
+    @extend_schema(
+        summary='get the classes for the client he already registered into'
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+        
+    @extend_schema(
+        summary='register in specific class'
+    )
+    def post(self,request, *args, **kwargs):
+        try:
+            request.data['client'] = Client.objects.get(user=request.user.pk).pk
+            return super().post(request, *args, **kwargs)
+        except Exception as e:
+            return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
+client_registration = ClientRegistrationListAV.as_view()
+
+class ClientRegistrationDetailsAV(generics.RetrieveUpdateDestroyAPIView):
+    
+    serializer_class = ClassRegisterSerializer
+    
+    def get_queryset(self):
+        qs = Client_Class.objects.filter(client__user = self.request.user.pk,is_deleted=False)
+        return qs
+    
+    @extend_schema(
+        summary='retrieve class registration details'
+    )
+    def get(self, request, *args, **kwargs):
+        
+        instance = self.get_object()
+        data = self.get_serializer(instance).data
+        now = datetime.datetime.now().date()
+        allowed_days = instance.class_id.start_date + relativedelta(days=instance.class_id.allowed_days_to_cancel)
+        
+        if now >  allowed_days :
+            return Response({'message':'you cannot update this registration','data':data,'update':False},status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response(data,status=status.HTTP_200_OK)
+        
+    @extend_schema(
+        summary='update class registration details'
+    )
+    def put(self, request, *args, **kwargs):
+        try:
+            request.data['client'] = Client.objects.get(user=request.user.pk).pk
+            return super().put(request, *args, **kwargs)
+        except Exception as e:
+            return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
+        
+    @extend_schema(
+        summary='delete class registration '
+    )
+    def delete(self, request, *args, **kwargs):
+        try:
+            client = Client.objects.get(user=request.user.pk)
+            DeleteRegistrationService.delete(self.get_object(),client)
+            return Response({'success':'registration deleted successfully'},status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
+    
+client_registration_details = ClientRegistrationDetailsAV.as_view()
+    
         
         

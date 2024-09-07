@@ -28,6 +28,7 @@ class Class_Scheduel(models.Model):
     allowed_days_to_cancel = models.IntegerField(default=0)
     updated_at = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
+    current_number_of_trainees = models.IntegerField(default=0)
     
     def delete(self):
         if self.is_deleted!= True:
@@ -37,6 +38,9 @@ class Class_Scheduel(models.Model):
 class Client_Class(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='classes')
     class_id = models.ForeignKey(Class_Scheduel, on_delete=models.CASCADE, related_name='clients')
-    retieved_money = models.IntegerField(default=0)
+    total = models.FloatField(default=0.0)
+    offered_total = models.FloatField(default=0.0)
+    retieved_money = models.FloatField(default=0, null=True)
     retrieved_reason = models.CharField(null = True, max_length=40)
+    is_deleted = models.BooleanField(default=False)
     

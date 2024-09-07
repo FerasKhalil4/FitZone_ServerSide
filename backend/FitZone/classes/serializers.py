@@ -1,11 +1,11 @@
 from rest_framework import serializers 
 from .models import *
+from .services import RegistrationClassService,UpdateRegistrationService
 from gym.seriailizers import TrainerSerialzier, BranchSerializer
-from gym.models import Trainer , Shifts ,Gym , Branch
-from user.serializers import ClientSerializer
+from gym.models import Trainer ,Gym , Branch
 from django.db.models import Q
 import datetime 
-from django.db.models import Count
+from dateutil.relativedelta import relativedelta
 
 class Class_ScheduelSerializer(serializers.ModelSerializer):
     class_scheduel_id = serializers.PrimaryKeyRelatedField(source = 'id',read_only = True)
@@ -17,7 +17,7 @@ class Class_ScheduelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Class_Scheduel
         fields=['start_date','end_date','start_time','end_time','trainer','trainer_id','days_of_week'
-                ,'class_scheduel_id','hall','allowed_number_for_class','allowed_days_to_cancel']
+                ,'class_scheduel_id','hall','allowed_number_for_class','allowed_days_to_cancel','current_number_of_trainees']
         
         
     def validate(self, data):
@@ -151,16 +151,10 @@ class ClassesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Classes
         fields = ['class_id','name','description','registration_fee',
-                'branch','branch_id','image_path','points','schedule']     
-    
-class ClassClientSerializer(serializers.ModelSerializer):
+                'branch','branch_id','image_path','points','schedule'] 
 
-    class Meta:
-        model = Client_Class
-        fields = '__all__'
-        
 
-class CreateClassSerializer(serializers.ModelSerializer):
+class CreateClassSerializer(serializers.ModelSerializer): 
     schedule = Class_ScheduelSerializer(source='scheduel', many=True)
 
     class Meta:
@@ -178,3 +172,90 @@ class CreateClassSerializer(serializers.ModelSerializer):
         for schedule in schedule_data:
             Class_Scheduel.objects.create(class_id=class_id, **schedule)
         return class_id
+    
+    
+    
+    
+
+class ClientClassesSerializer(serializers.ModelSerializer):
+    branch = BranchSerializer(read_only=True)
+    branch_id = serializers.IntegerField(write_only=True)    
+    class_id = serializers.PrimaryKeyRelatedField(source='pk',read_only=True)
+    schedule = Class_ScheduelSerializer(source = "scheduel",read_only=True,many=True)
+    class Meta:
+        model = Classes
+        fields = ['class_id','name','description','registration_fee',
+                'branch','branch_id','image_path','points','schedule'] 
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        print(representation)
+        try:
+            now = datetime.datetime.now().date()
+            for date in representation['schedule']:
+                allowed_date = datetime.datetime.strptime(date['start_date'],'%Y-%m-%d').date() + relativedelta(days=date['allowed_days_to_cancel'])
+                if now > allowed_date:
+                    representation['schedule'].remove(date)
+                elif date['current_number_of_trainees'] >= date['allowed_number_for_class']:
+                    representation['schedule'].remove(date)
+        except Exception as e:
+            raise serializers.ValidationError(str(e))
+        if len(representation['schedule']) > 0:
+            return representation    
+        
+        
+        
+class ClassSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Classes
+        fields = ['id','name','description','registration_fee','branch','image_path','points']
+        
+        
+class SchduleSerializer(serializers.ModelSerializer):
+    classes = ClassSerializer(source='class_id')
+    trainer = serializers.CharField(source='trainer.employee.user.username')
+    class Meta:
+        model = Class_Scheduel
+        fields = ['pk','start_time','end_time'
+                  ,'trainer','days_of_week'
+                  ,'start_date','end_date','hall','allowed_number_for_class',
+                  'allowed_days_to_cancel','classes']
+
+class ClassRegisterSerializer(serializers.ModelSerializer):
+    class_data = serializers.SerializerMethodField()
+    class_schedule_id = serializers.PrimaryKeyRelatedField(source='class_id',queryset =Class_Scheduel.objects.filter(is_deleted=False),required=True)
+    vouchers = serializers.ListField(
+        child = serializers.CharField()
+        ,write_only=True
+    )
+    class Meta: 
+        model = Client_Class
+        fields = ['client','class_schedule_id','class_data','vouchers','total','offered_total']
+        
+    
+    def get_class_data(self,obj):
+        try:
+            schdule = Class_Scheduel.objects.get(pk=obj.class_id.pk,is_deleted=False)
+            return {
+                'class_schedule':SchduleSerializer(schdule).data
+            }
+        except Exception as e:
+            raise serializers.ValidationError(str(e))
+        
+    
+    def create(self,data):
+        try:
+            instance = RegistrationClassService.register(data)
+            return instance
+        except Exception as e:
+            raise serializers.ValidationError(str(e))
+        
+    
+    def update(self,instance,data):
+        try:
+            if data['class_id'].pk == instance.class_id.pk:
+                raise serializers.ValidationError('you are already registered in this class')
+            UpdateRegistrationService.update(data,instance)
+            return
+        except Exception as e:
+            raise serializers.ValidationError(str(e))
