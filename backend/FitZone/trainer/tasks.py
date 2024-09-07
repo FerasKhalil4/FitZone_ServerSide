@@ -11,7 +11,7 @@ from django.core.exceptions import ValidationError
 def reject_expired_requests():
     try:
         now = datetime.datetime.now().date()
-        requests = Client_Trainer.objects.filter(registration_status = 'pending')
+        requests = Client_Trainer.objects.filter(registration_status = 'pending',is_updated=False,is_deleted=False)
         for request in requests:
             trainer = Trainer.objects.get(pk=request.trainer.pk)
             expired_time = request.created_at + relativedelta(days=3)

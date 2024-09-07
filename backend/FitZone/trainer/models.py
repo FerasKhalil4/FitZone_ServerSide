@@ -103,7 +103,8 @@ class TrainerGroups(models.Model):
             start_date__lte = today,
             end_date__gte = today,
             registration_type = 'private',
-            group = self.pk
+            group = self.pk,
+            is_deleted=False
         )
         clients =  Client_Trainer.objects.filter(query)
         if clients.exists():
@@ -114,7 +115,6 @@ class TrainerGroups(models.Model):
             self.check_delete()
             self.is_deleted = True
             self.save()
-        
         
         
 class Client_Trainer(models.Model):
@@ -131,19 +131,12 @@ class Client_Trainer(models.Model):
     trainer = models.ForeignKey(Trainer, on_delete=models.CASCADE, related_name="TrainersRegistrations")
     start_date = models.DateField(null=True)
     end_date = models.DateField(null=True)    
-    registration_type = models.CharField(max_length=30,choices=REGISTRATION_TYPES)
+    registration_type = models.CharField(max_length=30,choices=REGISTRATION_TYPES) 
     registration_status = models.CharField(max_length=20,default='pending', choices=REGISTRATION_STATUS)
     rejection_reason = models.CharField(max_length=100, null=True)
     group = models.ForeignKey(TrainerGroups,on_delete=models.CASCADE, related_name="clients",null=True)
     created_at = models.DateField(auto_now_add=True)
-    class Meta:
-        constraints = [
-            UniqueConstraint(fields=['client'],name='client_trainer_registration_status'
-                                ,condition=Q(start_date__lte = datetime.datetime.now().date(),
-                                            end_date__gte = datetime.datetime.now().date(),
-                            ) & (
-                                Q(registration_status = 'accepted')
-                                | Q(registration_status = 'pending')
-                            )
-                                )
-        ]
+    is_updated = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+    old_group_number  = models.IntegerField(null = True)
+    

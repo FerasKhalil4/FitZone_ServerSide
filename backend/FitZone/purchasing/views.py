@@ -5,7 +5,8 @@ from store.serializers import PublicStoreSerializer,PrivateStoreSerializer,Produ
 from store.models import Branch_products,Supplements,Accessories,Meals
 from rest_framework.response import Response
 from .DataExamples import private_purchasing,public_purchasing
-from .serializers import Private_Store_Purchase_Serializer, Public_Store_Purchase_Serializer,CLientPurchasingsSerializer,EditPurchaseSerializer,AddProductsToPurchase
+from .serializers import (Private_Store_Purchase_Serializer, Public_Store_Purchase_Serializer,PurchaseSerializer
+                            ,CLientPurchasingsSerializer,EditPurchaseSerializer,AddProductsToPurchase,EditPurchasesSerializer)
 from .models import Purchase
 from django.core.cache import cache
 from offers.models import Offer
@@ -44,15 +45,19 @@ def get_products(qs):
                     
     return data
 
+
 class PublicStoreListAV(generics.ListAPIView):
     serializer_class = ProductSerializer
-    @extend_schema(
-        summary='get products for public store' 
-    )
+
     def get_queryset(self):
         qs = Branch_products.objects.filter(branch__gym__allow_public_products=True,branch__has_store=True)
         data = get_products(qs)
         return data
+    
+    
+    @extend_schema(
+            summary='get products for public store' 
+    )
         
     def get(self,request,*args, **kwargs):
         cache_key = 'public_store_products'
@@ -80,6 +85,10 @@ class PublicStoreListAV(generics.ListAPIView):
 public_store = PublicStoreListAV.as_view()
 
 
+
+@extend_schema(
+    summary='get the details for products in public store' 
+)
 class Public_Product_DetailsRetrieveAV(generics.RetrieveAPIView):
     serializer_class = PublicStoreSerializer
     queryset = Product.objects.filter(is_deleted=False)
@@ -87,6 +96,11 @@ class Public_Product_DetailsRetrieveAV(generics.RetrieveAPIView):
 product_details = Public_Product_DetailsRetrieveAV.as_view()
 
 
+
+
+@extend_schema(
+    summary='get the details for products in private store' 
+)
 class Private_Product_DetailsRetrieveAV(generics.RetrieveAPIView):
     serializer_class = PrivateStoreSerializer
     queryset = Product.objects.filter(is_deleted=False)
@@ -119,6 +133,10 @@ class PrivateStoreLisAV(generics.ListAPIView):
         data = get_products(qs)
         return data
     
+    
+    @extend_schema(
+    summary='get the products for private store' 
+)
     def get(self,request,*args, **kwargs):
         try:
             branch= Branch.objects.get(pk=kwargs['branch_id'])
@@ -192,14 +210,17 @@ class PurchasePublicStoreAV(generics.CreateAPIView):
             return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
 purchase_public_store = PurchasePublicStoreAV.as_view()
 
-class CLientPurchasingsListAV(generics.RetrieveAPIView):
-    serializer_class = CLientPurchasingsSerializer
+class CLientPurchasingsListAV(generics.ListAPIView):
+    serializer_class = PurchaseSerializer
     
-    def get_object(self):
+    def get_queryset(self):
         try:
-            return Client.objects.get(user=self.request.user.pk)
+            client = Client.objects.get(user=self.request.user.pk)
+            purchases = Purchase.objects.filter(client=client, is_deleted=False)
+            return purchases
         except Client.DoesNotExist:
             raise ValueError('Client does not exist')
+        
     @extend_schema(
         summary='return the client purchases history',
     )
@@ -208,15 +229,9 @@ class CLientPurchasingsListAV(generics.RetrieveAPIView):
 
 purchases = CLientPurchasingsListAV.as_view()
 
-class CLientPurchasingsDetailsAV(generics.RetrieveDestroyAPIView):
+class CLientPurchasingsDetailsAV(generics.DestroyAPIView):
     serializer_class = Public_Store_Purchase_Serializer 
     queryset = Purchase.objects.filter(is_deleted=False)
-    
-    @extend_schema(
-        summary='return the client specific purchase details',
-    )
-    def get(self,request,*args,**kwargs):
-        return super().get(request,*args,**kwargs)
     
     @extend_schema(
         summary='delete the client specific purchase ',
@@ -232,18 +247,22 @@ class CLientPurchasingsDetailsAV(generics.RetrieveDestroyAPIView):
 purchases_details = CLientPurchasingsDetailsAV.as_view()
 
 class ProductsEditCheckAV(generics.RetrieveAPIView):   
-    serializer_class = EditPurchaseSerializer
-    queryset = Purchase.objects.all()
+    serializer_class = EditPurchasesSerializer
+    queryset = Purchase.objects.filter(is_deleted=False)
     
     @extend_schema(
-        summary='check if the user can update his purchase',
-        description = 'this will return the product the user can update'
+        summary='return all the products and the price offers purchased for specific order',
+        description = 'it has flag "allow update" that will either let the user update or delete specific product or not'
     )
     def get(self, request, *args, **kwargs):
-        check = self.get_serializer(self.get_object()).data
-        if check['products']is not None:
-            return Response(check,status=status.HTTP_200_OK)
-        return Response({'error':'you cannot edit your purchases'},status=status.HTTP_400_BAD_REQUEST)
+        try:
+            check = self.get_serializer(self.get_object()).data
+            
+            if check['products']is not None:
+                return Response(check,status=status.HTTP_200_OK)
+            return Response({'error':'you cannot edit your purchases'},status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
 
 check_purchasings = ProductsEditCheckAV.as_view()
 
@@ -271,8 +290,7 @@ class AddProductsToPurchaseAV(generics.CreateAPIView):
     queryset = Purchase.objects.all()
     
     @extend_schema(
-        summary='add products to purchase',
-        examples=[]
+        summary='add products to purchase in update',
     )
     
     def post(self, request, *args, **kwargs):

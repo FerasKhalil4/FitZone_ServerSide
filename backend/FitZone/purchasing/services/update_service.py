@@ -7,6 +7,7 @@ from django.db import transaction
 from wallet.models import Wallet,Wallet_Deposit
 from .public_store_services import *
 from .private_store_service import *
+from gym.models import Branch
 
 class UpdatePurchasing():
     
@@ -125,7 +126,7 @@ class UpdatePurchasing():
             # print(product['purchase_product_id'].product.price)
             # print(gym_percentage_cut)
             # print('==================================')
-            if 'amount' in product:
+            if 'amount' in product or product['amount'] is None:
                 print('==================================')
                 amount = product['amount'] - product_purchased.amount
                 print(amount)
@@ -164,7 +165,7 @@ class UpdatePurchasing():
                 # print(f' new item totel is {item_total}')
 
 
-            elif 'is_deleted' in product: 
+            elif 'is_deleted' in product or product['is_deleted'] is None: 
                 amount = -product_purchased.amount
                 branch_product.amount += product_purchased.amount
                 new_points -= branch_product.points_gained * product_purchased.amount
@@ -313,7 +314,7 @@ class UpdatePurchasing():
             else:
                 gym_percentage_cut = 1
             if not price_offer_purchased.price_offer.offer.is_deleted:
-                if 'amount' in offer:
+                if 'amount' in offer or offer['amount'] is not None:
                     amount = offer['amount'] - price_offer_purchased.amount
                     # print('=======================')
                     
@@ -335,7 +336,7 @@ class UpdatePurchasing():
                     # print(new_total)
                     
                     # print('=======================')
-                elif 'is_deleted' in offer: 
+                elif 'is_deleted' in offer or offer['is_deleted'] is not None: 
                     amount = -price_offer_purchased.amount
                     delete_item = UpdatePurchasing.delete_price_offer(price_offer_purchased,gym_percentage_cut,new_total,amount)
                     new_total = delete_item['new_total'] if flag is True else  new_total 
@@ -432,7 +433,10 @@ class UpdatePurchasing():
                 # print('@@@@@@@@@@@@@@@@@@@@@@@@')
 
                 wallet = Wallet.objects.get(client=client.pk)
+                
                 print(f'wallet old balance {wallet.balance}')
+                if (client_total > wallet.balance) and (client_total > 0): 
+                    raise ValueError('insufficient amount of money in the clients wallet')
                 wallet.balance -= client_total
                 print(f'wallet new balance {wallet.balance}')
                 # print('-------------------------------------------')
@@ -474,62 +478,60 @@ class UpdatePurchasing():
         except Exception as e:
             raise ValueError (str(e))
 
-
-
-
 class Check_Update():
     @staticmethod
-    def check_products(product_gym,gym,item):
+    def check_products(product_gym,gym,item,created_at) -> None:
         now = datetime.now().date()
-        excluded_id = None
         if product_gym.allow_retrival:
             if product_gym.pk not in gym :
-                allowed_date = item.purchase.created_at.date() + relativedelta(days=product_gym.duration_allowed)
+                allowed_date = created_at.date() + relativedelta(days=product_gym.duration_allowed)
                 if  now <= allowed_date:
+                    
+                    item['allow_update'] = True
                     gym[product_gym.pk] = True
                 
                 else:
-                    excluded_id = item.pk
+                    # excluded_id = item.pk
+                    item['allow_update'] = False
+                    gym[product_gym.pk] = False
+            else:
+                item['allow_update'] = gym[product_gym.pk]
+                    
         else: 
-            excluded_id = item.pk
-        return excluded_id
+            # excluded_id = item.pk
+            item['allow_update'] = False
+            gym[product_gym.pk] = False
+            
 
     @staticmethod
-    def check_editings(pk):
+    def check_editings(data):
         gym = {}
-        excluded_ids = []
-        purchases = Purchase_Product.objects.filter(purchase=pk,is_deleted=False)
-        offers = Purchase_PriceOffer.objects.filter(purchase=pk,is_deleted=False)
-        purchase_instance = Purchase.objects.get(pk=pk)
+        
+        purchases = data['products']
+        offers = data['PriceOffers']
+        purchase_instance = Purchase.objects.get(pk=data['purchase_pk'])
+        
         for purchase in purchases:
-            product_gym = purchase.product.branch.gym
+            product_gym = Branch.objects.get(pk=purchase['product_details']['branch']['id']).gym
 
             if (purchase_instance.number_of_updates <= product_gym.allowed_number_for_update) :
-                excluded_id = Check_Update.check_products(product_gym,gym,purchase)
-                if excluded_id is not None:
-                    excluded_ids.append(excluded_id) 
-            else:
-                excluded_ids.append(purchase.pk) 
+                Check_Update.check_products(product_gym,gym,purchase,purchase_instance.created_at)
+                print(Check_Update.check_products(product_gym,gym,purchase,purchase_instance.created_at))
                 
-        new_purchases =  purchases.exclude(id__in=excluded_ids)
+            else:
+                purchase['allow_update'] = False
             
-        excluded_ids = []
         for offer in offers:
-            product_gym = offer.price_offer.offer.branch.gym
-            if (purchase_instance.number_of_updates <= product_gym.allowed_number_for_update) :
+            product_gym = Branch.objects.get(pk=offer['offer_detail']['branch']['id']).gym
             
-                excluded_id = Check_Update.check_products(product_gym,gym,offer)
-                if excluded_id is not None:
-                    excluded_ids.append(excluded_id) 
-            else:
-                excluded_ids.append(offer.pk) 
+            if (purchase_instance.number_of_updates <= product_gym.allowed_number_for_update) :
+                Check_Update.check_products(product_gym,gym,offer,purchase_instance.created_at)
+                print(Check_Update.check_products(product_gym,gym,offer,purchase_instance.created_at))
                 
-        new_offers = offers.exclude(pk__in=excluded_ids)
+            else:
+                offer['allow_update'] = False
 
-        return {
-            'purchases': new_purchases,
-            'offers':new_offers
-        } if len(new_purchases) + len(new_offers) > 0 else None
+        return data
 
 class AddProductToPurchase():
     
@@ -584,3 +586,43 @@ class AddProductToPurchase():
             return purchasing_instance
         except Exception as e:
             raise ValueError(str(e))
+        
+        
+        
+    #         @staticmethod
+    # def check_editings(pk):
+    #     gym = {}
+    #     excluded_ids = []
+        
+    #     purchases = Purchase_Product.objects.filter(purchase=pk,is_deleted=False)
+    #     offers = Purchase_PriceOffer.objects.filter(purchase=pk,is_deleted=False)
+    #     purchase_instance = Purchase.objects.get(pk=pk)
+    #     for purchase in purchases:
+    #         product_gym = purchase.product.branch.gym
+
+    #         if (purchase_instance.number_of_updates <= product_gym.allowed_number_for_update) :
+    #             excluded_id = Check_Update.check_products(product_gym,gym,purchase)
+    #             if excluded_id is not None:
+    #                 excluded_ids.append(excluded_id) 
+    #         else:
+    #             excluded_ids.append(purchase.pk) 
+                
+    #     new_purchases =  purchases.exclude(id__in=excluded_ids)
+            
+    #     excluded_ids = []
+    #     for offer in offers:
+    #         product_gym = offer.price_offer.offer.branch.gym
+    #         if (purchase_instance.number_of_updates <= product_gym.allowed_number_for_update) :
+            
+    #             excluded_id = Check_Update.check_products(product_gym,gym,offer)
+    #             if excluded_id is not None:
+    #                 excluded_ids.append(excluded_id) 
+    #         else:
+    #             excluded_ids.append(offer.pk) 
+                
+    #     new_offers = offers.exclude(pk__in=excluded_ids)
+
+    #     return {
+    #         'purchases': new_purchases,
+    #         'offers':new_offers
+    #     } if len(new_purchases) + len(new_offers) > 0 else None

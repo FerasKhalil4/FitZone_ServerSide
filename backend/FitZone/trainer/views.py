@@ -13,9 +13,12 @@ from plans.serializers import ClientTrainingSerializer,Client_Trianing_Plan,Gym_
 from django.db.models import Q
 from nutrition.serializers import NutritionPlan,NutritionPlanSerializer
 from wallet.models import Wallet, Wallet_Deposit
+from .services import SubscripeWithTrainerService,DeleteSubscriptionWihtTrainerService
+
+
 class ClientsListAV(generics.ListAPIView):
     serializer_class = Client_TrainerSerializer
-    queryset = Client_Trainer.objects.filter(registration_status = 'pending')
+    queryset = Client_Trainer.objects.filter(registration_status = 'pending',is_deleted = False)
     @extend_schema(
             summary = 'get the clients registered with the trainer'
         )
@@ -35,7 +38,7 @@ clientlist = ClientsListAV.as_view()
 
 class ApproveClientsAV(generics.UpdateAPIView):
     serializer_class = Client_TrainerSerializer
-    queryset = Client_Trainer.objects.filter(registration_status = 'pending')
+    queryset = Client_Trainer.objects.filter(registration_status = 'pending',is_deleted = False)
 
         
     @extend_schema(
@@ -47,12 +50,9 @@ class ApproveClientsAV(generics.UpdateAPIView):
             with transaction.atomic():                
                 data=request.data
                 instance = self.get_object()
-                wallet = Wallet.objects.get(client_id=instance.client.pk) 
-                
                 
                 if instance.registration_status == 'accepted' or instance.registration_status == 'rejected':
                     return Response({'error':'you cant update the status of this client'},status = status.HTTP_400_BAD_REQUEST)
-
                 
                 user = request.user
                 trainer = Trainer.objects.get(employee__user = user)
@@ -62,6 +62,21 @@ class ApproveClientsAV(generics.UpdateAPIView):
                     return Response({'error':'invalid client'}, status=status.HTTP_400_BAD_REQUEST)   
                 
                 if data['registration_status'] == 'rejected':
+                     
+                    if ((instance.start_date is not None )and (instance.end_date is not None)) and (instance.is_updated) :
+                        print('reject active sub')
+                        print(instance.group)
+                        data['group'] = instance.old_group_number
+                        print(data['group'])
+                        data['old_group_number'] = None
+                        
+                        data['registration_status'] = 'accepted'
+                        
+                    else:
+                        print('passing')
+                        client = Client.objects.get(pk=instance.client.pk)
+                        wallet = Wallet.objects.get(client_id=instance.client.pk) 
+                    
                         fee = trainer.private_training_price if instance.registration_type == 'private' else trainer.online_training_price
                     
                         wallet.balance += fee
@@ -72,14 +87,17 @@ class ApproveClientsAV(generics.UpdateAPIView):
                             amount = fee,
                             tranasaction_type='retrieve'
                         )
-                        
+                        points = SubscripeWithTrainerService.get_points(fee)
+                        client.points -= points
+                        client.save()
+                            
                 
-                elif data['registration_status'] != 'rejected':
-                    start_date = datetime.datetime.now().date()
-                    end_date = start_date + relativedelta(months=1)
-                    data['start_date'] = start_date 
-                    data['end_date'] = end_date
-
+                elif data['registration_status'] == 'accepted':
+                    if (instance.start_date is None) and (instance.end_date is None) :
+                        start_date = datetime.datetime.now().date()
+                        end_date = start_date + relativedelta(months=1)
+                        data['start_date'] = start_date 
+                        data['end_date'] = end_date
                 serializer = self.get_serializer(instance, data=data, partial=True)
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
@@ -223,7 +241,7 @@ class ClientDetailsAV(generics.RetrieveAPIView):
                 return Response({'error':'trainer not found'}, status=status.HTTP_404_NOT_FOUND)
             now =  datetime.datetime.now().date()
             try:
-                instance = Client_Trainer.objects.get(client=kwargs['client_id'],trainer=trainer,start_date__lte = now, end_date__gte = now)
+                instance = Client_Trainer.objects.get(client=kwargs['client_id'],trainer=trainer,start_date__lte = now, end_date__gte = now,is_deleted=False)
             except Client_Trainer.DoesNotExist:
                 return Response({'error':'client not found for this trainer or training period'}, status=status.HTTP_404_NOT_FOUND)
             
@@ -232,8 +250,22 @@ class ClientDetailsAV(generics.RetrieveAPIView):
             return Response({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
 client_details = ClientDetailsAV.as_view()
 
+
+# @extend_schema(
+#     summary='get trainers for specific branch'
+# )
+# class TrainersListAV(generics.ListAPIView):
+#     serializer_class = TrainerProfileDataSerializer
+#     queryset = Trainer.objects.all()
+    
+#     def get_queryset(self):
+#         branch = self.kwargs['branch_id']
+#         trainers = Trainer.objects.filter(employee__employee__branch = branch)
+#         return trainers
+    
+# trainer_list = TrainersListAV.as_view()
 class TrainerProfileAV(generics.RetrieveAPIView):
-    serializer_class = TrainerSerialzier
+    serializer_class = TrainerProfileDataSerializer
     queryset = Trainer.objects.all()
     
     @extend_schema(
@@ -252,3 +284,60 @@ class TrainerProfileAV(generics.RetrieveAPIView):
         except Exception as e:
             return Response({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
 trainer_profile = TrainerProfileAV.as_view()
+
+class CLientTrainerRegistrationListAV(generics.ListCreateAPIView):
+    serializer_class = SubscriptionWithTrainerSerializer
+    queryset = Client_Trainer.objects.all()
+    
+    @extend_schema(
+        summary='get all clients previous subscriptions with trainers'
+    )
+    def get(self,request, *args, **kwargs):
+        
+        trainer_subs = Client_Trainer.objects.filter(client__user= self.request.user.pk , is_deleted=False)
+        data = Client_TrainerSerializer(trainer_subs,many=True).data
+        return Response(data,status=status.HTTP_200_OK)
+    
+        
+    @extend_schema(
+        summary='subscribe with new trainer'
+    )
+    def post(self, request, *args, **kwargs):
+        try:
+            request.data['client'] = Client.objects.get(user=request.user.pk).pk
+            return super().create(request, *args, **kwargs)
+        except Client.DoesNotExist:
+            return Response({'error':'this client does not exist'}, status=status.HTTP_404_NOT_FOUND)
+trainer_subscriptions = CLientTrainerRegistrationListAV.as_view()
+    
+
+class ClientTrainerRegistrationDetailsAV(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = SubscriptionWithTrainerSerializer
+    queryset = Client_Trainer.objects.filter(is_deleted =False)
+    
+    @extend_schema(
+        summary='get specific subscription details'
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+    
+    @extend_schema(summary='update the subscription with trainer')
+    def put(self, request, *args, **kwargs):
+        try:
+
+            request.data['client'] = Client.objects.get(user=request.user.pk).pk
+            return super().put(request, *args, **kwargs)
+        except Client.DoesNotExist:
+            return Response({'error':'this client does not exist'}, status=status.HTTP_404_NOT_FOUND)
+    
+    @extend_schema(summary='cancel the subscription with trainer')
+    def delete(self, request, *args, **kwargs):
+        try:
+            client =  Client.objects.get(user=request.user.pk)
+            DeleteSubscriptionWihtTrainerService.delete_sub(self.get_object(),client)
+            return Response({'success':'subscription deleted successfully'},status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
+        
+
+trainer_subs_details = ClientTrainerRegistrationDetailsAV.as_view()

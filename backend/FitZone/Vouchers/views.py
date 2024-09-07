@@ -20,6 +20,7 @@ class VoucherDetailsAV(generics.RetrieveUpdateDestroyAPIView):
     
 voucherDetails = VoucherDetailsAV.as_view()
 
+
 class RedeemListAV(generics.ListCreateAPIView):
     serializer_class = RedeemSerializer
     queryset = Redeem.objects.all()

@@ -125,26 +125,43 @@ class UpdateOfferSerialzier(serializers.Serializer):
         validate_fields(attrs)
         return super().validate(attrs)
 
-class EditPurchaseSerializer(serializers.ModelSerializer):
-    products = serializers.SerializerMethodField()
+class EditPurchasesSerializer(serializers.ModelSerializer):
+    products = Purchase_Product_Serializer(many=True,read_only=True)
+    PriceOffers = Purchase_Price_Offer_Serializer(many=True,read_only=True)
 
     class Meta:
         model = Purchase 
-        fields = ['products']
+        fields = ['products','PriceOffers']
+            
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        try:
+            # You can perform any additional modifications to the representation here
+            representation['purchase_pk'] = instance.pk
+            representation['purchase_from_public_store'] = instance.is_public
+            representation['number_of_updates'] = instance.number_of_updates
+            
+            update_service.Check_Update.check_editings(representation)
+            
+            return representation
+        except Exception as e:
+            raise serializers.ValidationError(str(e))
+
     
-    def get_products(self, obj):
-        items = update_service.Check_Update.check_editings(obj.pk)
-        return{
-            'purchase_pk':obj.pk,
-            'purchased_from_public_store':obj.is_public,
-            'number_of_updates': obj.number_of_updates,
-            'purchases': Purchase_Product_Serializer(items['purchases'],many=True).data,
-            'offers': Purchase_Price_Offer_Serializer(items['offers'],many=True).data
-        } if items is not None else None
+    # def get_products(self, obj):
+    #     items = update_service.Check_Update.check_editings(obj.pk)
+    #     print('--------------------------------')
+    #     if items is not None:
+    #         return {
+    #             'purchase_pk': obj.pk,
+    #             'purchased_from_public_store': obj.is_public,
+    #             'number_of_updates': obj.number_of_updates,
+    #             'purchases': Purchase_Product_Serializer(items['purchases'], many=True).data,
+    #             'offers': Purchase_Price_Offer_Serializer(items['offers'], many=True).data
+    #         }
+    #     else:
+    #         return {"error": "'products' not found"}
         
-    
-    
-    
 class EditPurchaseSerializer(serializers.ModelSerializer):
     
     product_purchased = Purchase_Product_Serializer(source='products',read_only=True,many=True)
@@ -200,3 +217,8 @@ class AddProductsToPurchase(serializers.ModelSerializer):
         except Exception as e:
             raise serializers.ValidationError(str(e)) 
         
+class PurchaseSerializer(serializers.ModelSerializer):
+    purchase_id = serializers.PrimaryKeyRelatedField(source='pk',read_only=True)
+    class Meta:
+        model = Purchase
+        fields = ['purchase_id','total','offered_total','created_at','is_public','number_of_updates']

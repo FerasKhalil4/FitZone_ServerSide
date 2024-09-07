@@ -88,7 +88,8 @@ class PlanMixin():
             trainer=trainer ,
             client=client,
             registration_status='accepted',
-            end_date__gte = today
+            end_date__gte = today,
+            is_deleted=False
         )
         
         check_availability = Client_Trainer.objects.filter(query) 

@@ -4,7 +4,7 @@ from .models import  *
 class VoucherSerializer(serializers.ModelSerializer):
     class Meta:
         model = Voucher
-        fields = ['id','name','points_required','number_of_days','is_deleted','restrict_num_using','discount']
+        fields = ['id','name','points_required','number_of_days','restrict_num_using','discount']
         
 class RedeemSerializer(serializers.ModelSerializer):
     voucher_date = VoucherSerializer(source='voucher',read_only=True)

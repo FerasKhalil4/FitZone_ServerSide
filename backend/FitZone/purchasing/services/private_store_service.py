@@ -4,7 +4,6 @@ from datetime import datetime
 from wallet.models import Wallet,Wallet_Deposit
 from store.models import Supplements
 from Vouchers.models import  Redeem
-from django.db import IntegrityError
 class PrivateStoreService():
     
     @staticmethod
