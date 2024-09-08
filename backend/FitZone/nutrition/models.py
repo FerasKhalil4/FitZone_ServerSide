@@ -7,7 +7,7 @@ import datetime
 
 class NutritionPlan(models.Model):
     
-    trainer = models.ForeignKey(Trainer, on_delete=models.CASCADE, related_name='nutrition_plans')
+    trainer = models.ForeignKey(Trainer, on_delete=models.CASCADE, related_name='nutrition_plans',null=True)
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='nutrition_plans')
     name = models.CharField(max_length=20)
     start_date = models.DateField(blank=True)
@@ -60,8 +60,8 @@ class MealsType(models.Model):
 class Meals(models.Model):
     meals_type = models.ForeignKey(MealsType, on_delete=models.CASCADE, related_name='meals')
     name = models.CharField(max_length=30)
-    portion_size = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
-    portion_unit = models.CharField(max_length=20)
+    portion_size = models.DecimalField(max_digits=5, decimal_places=2, default=0.0,null=True)
+    portion_unit = models.CharField(max_length=20,null=True)
     alternateives = models.JSONField(default=dict)
     is_deleted = models.BooleanField(default=False)
     

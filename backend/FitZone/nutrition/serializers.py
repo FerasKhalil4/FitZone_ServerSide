@@ -38,7 +38,7 @@ class MealsScheduleSerializer(serializers.ModelSerializer):
     meals_schedule_id = serializers.PrimaryKeyRelatedField(source='id', read_only=True)
     meals_types = MealsTypeSerializer(many=True,write_only=True,required=False)
     same_meals = serializers.SerializerMethodField()
-    meals_type_data = serializers.SerializerMethodField()
+    meals_type_data = serializers.SerializerMethodField() 
     class Meta:
         model = MealsSchedule
         fields = ['day', 'meals_schedule_id', 'meals_types','same_as_day','same_meals','meals_type_data']
@@ -56,6 +56,7 @@ class NutritionPlanSerializer(serializers.ModelSerializer):
     client = ClientSerializer(read_only=True)
     trainer = TrainerSerialzier(read_only=True)
     is_active = serializers.BooleanField(read_only=True)
+    trainer = serializers.PrimaryKeyRelatedField(queryset = Trainer.objects.all(),required = False)
     class Meta: 
         model = NutritionPlan
         fields = [
@@ -69,29 +70,36 @@ class NutritionPlanSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Client plan  is already has active plan')
         check_registration = Client_Trainer.objects.filter(trainer=trainer,client=client,
                                                            start_date__lte=today,end_date__gte=today,
-                                                           registration_status='accepted')
+                                                           registration_status='accepted',is_deleted=False)
         if len(check_registration)!= 1:
             raise serializers.ValidationError('Client is not registered with this trianer')
         return client
+    
     def validate_schedule(self,schedule):
         if len(schedule) != 7 :
             raise serializers.ValidationError('schedule must contain 7 days')
+        
         return schedule
     def validate(self,data):
         if  data['is_same'] == True and len(data['meals_schedules']) != 1:
             raise serializers.ValidationError('Multiple schedules where added but is_same flag is set to True also ')
+        self.validate_schedule(data['meals_schedules'])
         return data
     
         
     def create(self, validated_data):
         client = self.context.get('client')
-        trainer = self.context.get('trainer')
-        
-        self.check_client_plan(client,trainer,today)
-        
+        trainer = self.context.get('trainer',None)
         meals_schedule_data = validated_data.pop('meals_schedules')
-        nutrition_plan = NutritionPlan.objects.create(client=client,trainer=trainer,**validated_data)
-
+        
+        if trainer is not None:
+            
+            self.check_client_plan(client,trainer,today)
+            nutrition_plan = NutritionPlan.objects.create(client=client,trainer=trainer,**validated_data)
+        
+        else:
+            nutrition_plan = NutritionPlan.objects.create(client=client,**validated_data )
+            
         for schedule_data in meals_schedule_data:
             schedule_data['nutrition_plan'] = nutrition_plan  
 

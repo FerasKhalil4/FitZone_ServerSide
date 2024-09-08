@@ -17,13 +17,6 @@ class NutritionPlanListAV(generics.ListAPIView):
     )
     def get (self, request, *args, **kwargs):
         try:
-            today = datetime.datetime.now().date()
-            query = Q (
-                client=client,
-                start__lte = today,
-                end_date__gte = today,
-                is_active=True
-            )
             client = Client.objects.get(user = request.user.id)
             nutrition_plans = NutritionPlan.objects.get(client=client, is_active=True)
             serializer = NutritionPlanSerializer(nutrition_plans, many=True)
@@ -46,7 +39,11 @@ class NutritionPlanCreateAV(generics.CreateAPIView):
             with transaction.atomic():
                 client_id = kwargs['client_id']
                 client = Client.objects.get(id=client_id)
-                trainer = Trainer.objects.get(employee__user__pk=request.user.pk)
+                trainer = None
+                try:
+                    trainer = Trainer.objects.get(employee__user__pk=request.user.pk)
+                except Trainer.DoesNotExist:
+                    pass
                 data = request.data.copy()
                 serializer = self.get_serializer(data=data, context={'client': client, 'trainer': trainer})
                 serializer.is_valid(raise_exception=True)
