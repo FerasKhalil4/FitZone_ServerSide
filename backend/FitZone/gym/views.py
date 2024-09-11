@@ -12,9 +12,15 @@ from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
 from community.paginations import Pagination
 import json
+from django_filters.rest_framework import DjangoFilterBackend
+from .filters import UserFilter ,GymFilter,EmployeeFilter,TrainerFilter
+
+
 class GymListCreateAV(generics.ListCreateAPIView):
     serializer_class = GymSerializer
     pagination_class = Pagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = GymFilter
     # permission_classes = [IsAuthenticated,admin_permissions]
     
     def get_queryset(self):
@@ -187,18 +193,22 @@ branchDetailAV =BranchDetailAV.as_view()
 
 class EmployeeListAV(generics.ListCreateAPIView):  
     queryset = Employee.objects.all()
-    serializer_class = ShiftSerializer  
+    serializer_class = ShiftSerializer 
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = EmployeeFilter
+     
     # permission_classes = []
     def get(self, request, branch_id, format=None):
         try:
             shifts = Shifts.objects.filter(branch_id=branch_id)
-            shift_serializer = ShiftSerializer(shifts , many = True)
+            qs = self.filter_queryset(shifts)
+            shift_serializer = ShiftSerializer(qs , many = True)
             shift_data = shift_serializer.data                     
             return Response(shift_data)
         except Exception as e :
             return Response ({'error': str(e)})
     def post(self, request, branch_id ,*args , **kwargs):
-        try:
+        try: 
             with transaction.atomic():
                 data = request.data 
                 data['is_trainer'] = False
@@ -222,6 +232,8 @@ employeeListAV = EmployeeListAV.as_view()
 
 class TrainerListAV(generics.ListCreateAPIView):
     serializer_class = EmployeeSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = TrainerFilter
     
     def get_queryset(self, id):
         return Employee.objects.filter(is_trainer = True , user__is_deleted= False , employee__branch_id=id)
@@ -229,6 +241,8 @@ class TrainerListAV(generics.ListCreateAPIView):
     def get(self, request,branch_id, *args, **kwargs):
         try:
             qs = self.get_queryset(branch_id)
+            qs = self.filter_queryset(qs)
+            
             serializer = self.get_serializer(qs,many=True)
             return Response(serializer.data)
         except Exception as e:

@@ -9,6 +9,6 @@ urlpatterns = [
     path('groups/<int:pk>/',TrainerGroupsDetail,name='trainerGroups'),
     path('clients/details/<int:client_id>/',client_details,name='client_details'),
     path('profile/',trainer_profile,name='trainer_profile'),
-    path('subscribe/',trainer_subscriptions,name = 'trainer_subscriptions'),
+    path('subscription/',trainer_subscriptions,name = 'trainer_subscriptions'),
     path('subscription/<int:pk>/',trainer_subs_details,name='trainer_subs_details'),
 ]

@@ -39,10 +39,10 @@ class Gym_Subscription(models.Model):
     
     def check_registration_overlap(self)->None:
         print(self.client)
-        check = Gym_Subscription.objects.filter(client=self.client,start_date__lte=now,end_date__gte=now,is_active=True).exclude(id = self.id)
+        check = Gym_Subscription.objects.filter(client=self.client,start_date__lte=now,end_date__gte=now,is_active=True,branch=self.branch).exclude(id = self.id)
         print(check)
         if check.exists():
-            raise ValidationError('Client is already registered')
+            raise ValidationError('Client is already registered in this branch')
         
     def check_gym_capacity(self):
         if (self.branch.gym.is_deleted == False) and (self.branch.is_active == True):
@@ -216,7 +216,8 @@ class Branch_Sessions(models.Model):
         
     def check_time(self):
         print('check time')
-        if not Branch_Sessions.objects.filter(client=self.client,branch=self.branch).exists():
+        if not Branch_Sessions.objects.filter(client=self.client,branch=self.branch,created_at__date = datetime.datetime.now().date()).exclude(id=self.id).exists():
+            print('add_points')
             self.get_points()
         else:
             print('check failed')

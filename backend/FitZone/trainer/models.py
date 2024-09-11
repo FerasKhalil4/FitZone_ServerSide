@@ -40,7 +40,7 @@ class TrainerGroups(models.Model):
         if check.exists() and gender:
             for day in check:
                 if day.day_of_week not in self.days_off.values():
-                    raise ValidationError('as a male trainer you cany train groups in the hours you provide')
+                    raise ValidationError('as a male trainer you cant train groups in the hours you provide')
             
     def check_trainer_shift(self):
         gym_open_hour = self.gym.start_hour

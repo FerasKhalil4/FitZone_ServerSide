@@ -6,6 +6,7 @@ from django.db.models import Q
 from points.models import Points
 from django.db import transaction
 from dateutil.relativedelta import relativedelta
+from gym_sessions.models import Gym_Subscription 
 
 
 class SubscripeWithTrainerService():
@@ -109,8 +110,8 @@ class SubscripeWithTrainerService():
 
         
     @staticmethod 
-    def check_client_trainer(branch) -> None:
-        check = Shifts.objects.filter(branch=branch,is_active=True)
+    def check_client_trainer(branches,trainer) -> None:
+        check = Shifts.objects.filter(branch__pk__in=branches,is_active=True,employee__trainer__pk=trainer.pk)
         if not check.exists():
            raise ValidationError('client is not subscribed with the same gym as the trainer') 
     
@@ -141,8 +142,9 @@ class SubscripeWithTrainerService():
         trainer = data.pop('trainer')
         registration_type = data.pop('registration_type')
         group = data.pop('group',None)
-        branch = data.pop('branch',None)
+        # branch = data.pop('branch',None)
         now =  datetime.now().date()
+        branches = Gym_Subscription.objects.filter(client=client,start_date__lte = now, end_date__gte = now,is_active=True).values_list('branch', flat=True)
         payment_total = trainer.private_training_price if group is not None else trainer.online_training_price
         
         query = SubscripeWithTrainerService.check_client_sub_overlap(client,now)
@@ -152,7 +154,7 @@ class SubscripeWithTrainerService():
         
         if group is not None:
             
-            SubscripeWithTrainerService.check_client_trainer(branch)
+            SubscripeWithTrainerService.check_client_trainer(branches,trainer)
             SubscripeWithTrainerService.check_group(group,now)
             
             SubscripeWithTrainerService.check_overlap_query(client,group.days_off,group.start_hour,group.end_hour,now)

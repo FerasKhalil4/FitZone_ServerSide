@@ -6,7 +6,7 @@ from store.models import Branch_products,Supplements,Accessories,Meals
 from rest_framework.response import Response
 from .DataExamples import private_purchasing,public_purchasing
 from .serializers import (Private_Store_Purchase_Serializer, Public_Store_Purchase_Serializer,PurchaseSerializer
-                            ,CLientPurchasingsSerializer,EditPurchaseSerializer,AddProductsToPurchase,EditPurchasesSerializer)
+                            ,EditPurchaseSerializer,AddProductsToPurchase,EditPurchasesSerializer)
 from .models import Purchase
 from django.core.cache import cache
 from offers.models import Offer
@@ -19,67 +19,91 @@ from user.models import Client
 from .services.delete_purchase_service import Delete_Purchase
 
 
-def get_products(qs):
+
+def get_products(qs,name=None,brand=None):
     data = {}
     for product in qs:
-        print(product)
         if product.amount > 0 and product.is_available:
             if product.product_type == 'Supplement':
                 supplement = Supplements.objects.filter(pk=product.product_id).first()
                 if supplement is not None:
                     if supplement.product.pk not in data:
-                        data[supplement.product.pk] = ProductSerializer(supplement.product).data
-                    
+                        if (name and ( name.lower() in supplement.product.name.lower())) or (brand and (brand.lower() in supplement.product.brand.lower())):
+
+                            print('--------------------')
+                            data[supplement.product.pk] = ProductSerializer(supplement.product).data
+                        elif name is None and brand is None:
+                            print('(*************************')
+                            data[supplement.product.pk] = ProductSerializer(supplement.product).data
                 
             elif product.product_type == 'Accessory':
                 accessory = Accessories.objects.filter(pk=product.product_id).first()
                 if accessory is not None:
                     if accessory.product.pk not in data:
-                        data[accessory.product.pk] = ProductSerializer(accessory.product).data
+                        
+                        if (name and ( name.lower() in accessory.product.name.lower())) or (brand and (brand.lower() in accessory.product.brand.lower())):
+                            
+                            print('--------------------')
+                            
+                            data[accessory.product.pk] = ProductSerializer(accessory.product).data
+                        elif name is None and brand is None:
+                            print('(*************************')
+                            
+                            data[accessory.product.pk] = ProductSerializer(accessory.product).data
+                            
             
             elif product.product_type == 'Meal':
                 meal = Meals.objects.filter(pk=product.product_id).first()
                 if meal is not None:
                     if meal.product.pk not in data:
-                        data[meal.product.pk] = ProductSerializer(meal.product).data
+                        if (name and ( name.lower() in meal.product.name.lower())) or (brand and (brand.lower() in meal.product.brand.lower())):
+                            
+                            print('--------------------')
+                            data[meal.product.pk] = ProductSerializer(meal.product).data
+                        elif name is None and brand is None:
+                            print('(*************************')
+                            
+                            data[meal.product.pk] = ProductSerializer(meal.product).data
+                            
+                            
                     
     return data
 
-
+ 
 class PublicStoreListAV(generics.ListAPIView):
     serializer_class = ProductSerializer
 
     def get_queryset(self):
+        print(self.request.GET)
+        name = self.request.GET.get('name', None)
+        brand = self.request.GET.get('brand', None)
         qs = Branch_products.objects.filter(branch__gym__allow_public_products=True,branch__has_store=True)
-        data = get_products(qs)
+        data = get_products(qs,name=name,brand=brand)
         return data
     
     
-    @extend_schema(
+    @extend_schema( 
             summary='get products for public store' 
     )
         
     def get(self,request,*args, **kwargs):
-        cache_key = 'public_store_products'
-        data = cache.get(cache_key)
-        if not data:
-            now = datetime.now().date()
-            offers_qs = Offer.objects.filter(price_offers__isnull=False,start_date__lte=now,end_date__gte=now,
-                                             is_deleted=False,branch__gym__allow_public_products=True,
-                                             price_offers__objects__fee__isnull=True)
-            offer_data =[]
+        now = datetime.now().date()
+        offers_qs = Offer.objects.filter(price_offers__isnull=False,start_date__lte=now,end_date__gte=now,
+                                            is_deleted=False,branch__gym__allow_public_products=True,
+                                            price_offers__objects__fee__isnull=True)
+        offer_data =[]
+        if len(request.GET) == 0:
             for offer in offers_qs:
                 
                 for product in offer.price_offers.objects.values():
                     amount_product = Branch_products.objects.get(pk=product['product_id']).amount
                     if amount_product > 0 :
                         offer_data.append(Price_offersStoreSerializer(offer).data)
-            products_data = self.get_queryset()
-            data = {
-                'products':products_data,
-                'offers':offer_data
-            }
-            cache.set(cache_key,data,timeout=60*20) 
+        products_data = self.get_queryset()
+        data = {
+            'products':products_data,
+            'offers':offer_data
+        }
             
         return Response(data,status=status.HTTP_200_OK)  
 public_store = PublicStoreListAV.as_view()
@@ -96,15 +120,13 @@ class Public_Product_DetailsRetrieveAV(generics.RetrieveAPIView):
 product_details = Public_Product_DetailsRetrieveAV.as_view()
 
 
-
-
 @extend_schema(
     summary='get the details for products in private store' 
 )
 class Private_Product_DetailsRetrieveAV(generics.RetrieveAPIView):
     serializer_class = PrivateStoreSerializer
     queryset = Product.objects.filter(is_deleted=False)
-    
+
     def get(self,request,*args, **kwargs):
         try:
             instance = Product.objects.get(id=self.kwargs['pk'])
@@ -115,22 +137,16 @@ class Private_Product_DetailsRetrieveAV(generics.RetrieveAPIView):
     
 private_product_details = Private_Product_DetailsRetrieveAV.as_view()
 
-def filtering_data(data,filtering):
-    products = data.get('products').get('products').get(filtering)
-    offers = data.get('offers')
-    data = {
-    'products':products,
-    'offers':offers
-                }
-    return data
 
-class PrivateStoreLisAV(generics.ListAPIView):
+class PrivateStoreListAV(generics.ListAPIView):
     serializer_class = PrivateStoreSerializer
     
     def get_queryset(self):
+        name = self.request.GET.get('name', None)
+        brand = self.request.GET.get('brand', None)
         branch_id = self.kwargs.get('branch_id')
         qs = Branch_products.objects.filter(branch=branch_id,branch__has_store=True)
-        data = get_products(qs)
+        data = get_products(qs,name=name,brand=brand)
         return data
     
     
@@ -140,42 +156,31 @@ class PrivateStoreLisAV(generics.ListAPIView):
     def get(self,request,*args, **kwargs):
         try:
             branch= Branch.objects.get(pk=kwargs['branch_id'])
-            cache_key = f'private_store_products{branch.pk}'
-            data = cache.get(cache_key)
             
-            filtering = request.GET.get('product_type', None)
+            now = datetime.now().date()
+            offers_qs = Offer.objects.filter(price_offers__isnull=False,branch=kwargs['branch_id'],start_date__lte=now,end_date__gte=now,
+                                                            is_deleted=False,price_offers__objects__fee__isnull=True)
             
-            if filtering is not None and data is not None: 
-                data = filtering_data(data,filtering)
-                return Response(data,status=status.HTTP_200_OK)
-                
-            if not data:
-                now = datetime.now().date()
-                offers_qs = Offer.objects.filter(price_offers__isnull=False,branch=kwargs['branch_id'],start_date__lte=now,end_date__gte=now,
-                                                                is_deleted=False,price_offers__objects__fee__isnull=True)
-                
-                offer_data =[]
+            offer_data =[]
+            if len(request.GET) == 0:
                 for offer in offers_qs:
                     
                     for product in offer.price_offers.objects.values():
                         amount_product = Branch_products.objects.get(pk=product['product_id']).amount
                         if amount_product > 0 :
                             offer_data.append(Price_offersStoreSerializer(offer).data)
-                            
-                products_data = self.get_queryset()
-                data = {
-                    'products':products_data,
-                    'offers':offer_data
-                }
-                cache.set(cache_key,data,timeout=60*20) 
-                if filtering:   
-                    data = filtering_data(data,filtering)
-                       
+                        
+            products_data = self.get_queryset()
+            data = {
+                'products':products_data,
+                'offers':offer_data
+            }
+                    
             return Response(data,status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
     
-private_store = PrivateStoreLisAV.as_view()
+private_store = PrivateStoreListAV.as_view()
 
 class PurchasePrivateStoreAV(generics.CreateAPIView):
     serializer_class = Private_Store_Purchase_Serializer

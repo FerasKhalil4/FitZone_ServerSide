@@ -111,12 +111,13 @@ class TrainerProfileDataSerializer(TrainerSerialzier):
         
 class SubscriptionWithTrainerSerializer(Client_TrainerSerializer):
     # group_id = serializers.PrimaryKeyRelatedField(queryset = TrainerGroups.objects.all(),source='group',write_only=True)
-    branch = serializers.PrimaryKeyRelatedField(queryset = Branch.objects.filter(is_active=True),write_only=True)
+    # branch = serializers.PrimaryKeyRelatedField(queryset = Branch.objects.filter(is_active=True),write_only=True)
     group_data = TrainerGroupsSerializer(source='group',read_only=True)
     class Meta:
         model = Client_Trainer
         fields = ['Trainer_registration_id','client','client_details','trainer','start_date'
-                  ,'end_date','registration_type','registration_status','rejection_reason','group','branch','group_data']
+                  ,'end_date','registration_type','registration_status','rejection_reason','group','group_data']
+        # branch
         
     def validate(self,data):
         if 'registration_type' in data:

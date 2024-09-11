@@ -44,23 +44,25 @@ class SessionMixin():
             
     @staticmethod
     def check_sub_one_branch_access(client,branch_id):
-
         query = SessionMixin.get_query(client)
         query &= Q(
         branch = branch_id,
         )
         
-        try:
-            check = Gym_Subscription.objects.get(query)
-        except Gym_Subscription.DoesNotExist:
+        # try:
+        check = Gym_Subscription.objects.filter(query)
+        if not check.exists():
+            
+        # except Gym_Subscription.DoesNotExist:
             raise ValidationError({'error':'user is not registered in any gym currently'})
-        if check:
-            workout = SessionMixin.get_client_todays_workout(client)
-            print(workout)
-            if workout is not None:
-                if workout.name == 'Rest':
-                    raise ValidationError({'error':'you cannot train today it is you rest day'})
-                return workout
+        workout = SessionMixin.get_client_todays_workout(client)
+        print(workout)
+        if workout is not None:
+            if workout.name == 'Rest':
+                raise ValidationError({'error':'you cannot train today it is you rest day'})
+            return workout
+        # else:
+        #      raise ValidationError({'error':'user is not registered in any gym currently'})
         return None
     
     @staticmethod
@@ -68,18 +70,21 @@ class SessionMixin():
         
         base_query = SessionMixin.get_query(client)
         
-        try:
-            check = Gym_Subscription.objects.get(base_query)
-        except Gym_Subscription.DoesNotExist:
+        # try:
+        check = Gym_Subscription.objects.filter(base_query)
+        # except Gym_Subscription.DoesNotExist:
+        if not check.exists():
             raise ValidationError({'error':'user is not registered in any gym currently'})
-        gym = check.branch.gym
+        for item in check :
+            if item.branch.gym == branch.gym:
+        # gym = check.branch.gym
         
-        if gym == branch.gym :
-            workout = SessionMixin.get_client_todays_workout(client)
-            if workout is not None:
-                if workout.name == 'Rest':
-                    raise ValidationError({'error':'you cannot train today it is you rest day'})
-                return workout
+        # if gym == branch.gym :
+                workout = SessionMixin.get_client_todays_workout(client)
+                if workout is not None:
+                    if workout.name == 'Rest':
+                        raise ValidationError({'error':'you cannot train today it is you rest day'})
+                    return workout
         return None
 
     @staticmethod
