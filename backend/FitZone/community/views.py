@@ -17,11 +17,7 @@ class PostListAV(generics.ListCreateAPIView):
             return Response(serializer.data)
         except Exception as e:
             raise serializers.ValidationError(str(e))
-    #for Clients
-    # def get(self, request, *args, **kwargs):
-    #     gym_id = request.data['gym_id']
-    #     query = Q(gym_id=gym_id) | Q(gym__allow_public_posts = True)
-    #     posts = Post.objects.filter(query)        
+     
     def post(self, request,gym_id, *args, **kwargs):
         
         user = request.user

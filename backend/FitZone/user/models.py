@@ -10,7 +10,6 @@ class Client(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE , related_name="client") 
     points = models.IntegerField(default=0)
     height = models.FloatField(default=0.0)
-    app_rate = models.IntegerField(null = True)
     address = models.CharField(null = True)
     qr_code_image = models.ImageField(upload_to = 'qr_codes',null = True)
     url = models.URLField(blank=True)

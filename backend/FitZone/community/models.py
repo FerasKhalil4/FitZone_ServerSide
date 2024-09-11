@@ -5,7 +5,8 @@ class Post(models.Model):
     poster = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="poster")
     gym = models.ForeignKey(Gym, on_delete=models.CASCADE,related_name="post")
     content = models.TextField(blank=True, null=True)
-    like_count = models.IntegerField(default=0)
+    reaction_count = models.IntegerField(default=0)
+    comments_count = models.IntegerField(default=0)
     is_approved = models.BooleanField(default=True)
     approved_by = models.ForeignKey(Employee,on_delete=models.CASCADE, related_name="approved",null = True)
     is_deleted = models.BooleanField(default=False)
@@ -23,9 +24,17 @@ class Video(models.Model):
     post = models.ForeignKey(Post , on_delete=models.CASCADE, related_name='videos')
     video = models.FileField(upload_to='videos/')
     
-class likes(models.Model):
-    post = models.ForeignKey(Post , on_delete=models.CASCADE, related_name='likes')
-    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='likes')
+class Reactions(models.Model):
+    REACTIONS_CHOICES =[
+       ('like','like'),
+       ('dislike','dislike'),
+       ('laugh','laugh'),
+       ('surprise','surprise'),
+       ('confused','confused'),
+    ]
+    post = models.ForeignKey(Post , on_delete=models.CASCADE, related_name='reactions')
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='reactions')
+    reaction = models.CharField(max_length=10, choices=REACTIONS_CHOICES)
     created_at = models.DateTimeField(auto_now_add=True)
 
 class Comments(models.Model):
@@ -33,3 +42,4 @@ class Comments(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='comments')
     comment = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_deleted = models.BooleanField(default=False)

@@ -27,7 +27,7 @@ class BranchSerializer(serializers.ModelSerializer):
     address = serializers.CharField(max_length=50)
     class Meta :
         model = Branch
-        fields = ['id','address' ,'city','street', 'has_store' , 'is_active','qr_code_image','url','number_of_clients_allowed','current_number_of_clients']
+        fields = ['id','address' ,'city','street', 'has_store' , 'is_active','qr_code_image','url','number_of_clients_allowed','current_number_of_clients','rate','number_of_rates']
         
     def create(self, validated_data):
         request = self.context.get('request')
@@ -236,7 +236,7 @@ class TrainerSerialzier(serializers.ModelSerializer):
     employee = EmployeeSerializer(read_only=True)
     class Meta:
         model = Trainer 
-        fields= ['id','employee','employee_id','allow_public_posts','online_training_price','private_training_price']
+        fields= ['id','employee','employee_id','allow_public_posts','online_training_price','private_training_price','rate','number_of_rates']
 
 class AvailableGymsSerializer(serializers.ModelSerializer):
     branches = serializers.SerializerMethodField()

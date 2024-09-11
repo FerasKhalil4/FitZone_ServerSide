@@ -196,13 +196,23 @@ class LoginAV(APIView):
                         if not goal.exists():
                             data['goal_error'] = 'please add new goal to be tracked'
                             
-                        client_current_sub = Gym_Subscription.objects.get(client=client.pk, is_active=True)
+                        client_current_sub = Gym_Subscription.objects.filter(client=client.pk, is_active=True)
                     except Client.DoesNotExist:
                         return Response({'error':'Account does not exist'},status=status.HTTP_400_BAD_REQUEST)
                     except Gym_Subscription.DoesNotExist:
                         pass
-                    data['branch_id'] = client_current_sub.branch.pk if client_current_sub is not None else None
-                    data ['gym_id'] = client_current_sub.branch.gym.pk if client_current_sub is not None else None
+                    data['gyms'] = {}
+                    for item in client_current_sub:
+                        if item.branch.gym.pk not in data['gyms'] :
+                            data['gyms'][item.branch.gym.pk] = []
+                            data['gyms'][item.branch.gym.pk].append(
+                                {'branch':item.branch.pk}
+                            )
+                        else:
+                            data['gyms'][item.branch.gym.pk].append( 
+                                {'branch':item.branch.pk}
+                                )
+    
                 refresh = RefreshToken.for_user(account)
                 
                 data['token'] = {'refresh_token':str(refresh) ,

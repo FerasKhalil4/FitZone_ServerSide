@@ -24,6 +24,7 @@ class Gym(models.Model):
     allow_branches_access = models.BooleanField(default=False)
     allowed_number_for_update = models.IntegerField(default=0)
 
+
     def __str__(self) -> str:
         return f"{self.id}:{self.name}"
     
@@ -62,6 +63,8 @@ class Branch(models.Model):
     qr_code_image = models.ImageField(upload_to='qr_codes', null=True, blank=True)
     number_of_clients_allowed = models.IntegerField(default=0)
     current_number_of_clients= models.IntegerField(default=0)
+    rate = models.FloatField(default=0.0)
+    number_of_rates = models.IntegerField(default=0)
     
     def generate_qr_code(self,data):
         url = data
@@ -102,6 +105,9 @@ class Trainer(models.Model):
     allow_public_posts = models.BooleanField(default=True)
     private_training_price = models.FloatField(default=0.00)
     online_training_price = models.FloatField(default=0.00)
+    rate = models.FloatField(default=0.0)
+    number_of_rates = models.IntegerField(default=0)
+    
 
 class Shifts (models.Model):
     employee = models.ForeignKey(Employee , on_delete=models.CASCADE, related_name="employee")
