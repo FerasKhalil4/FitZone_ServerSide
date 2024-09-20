@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import( public_store,private_store,purchase_private_store,
-                    purchase_public_store,product_details,private_product_details,purchases,purchases_details,check_purchasings,add_products,update_purchase)
+                    purchase_public_store,product_details,private_product_details,purchases,purchases_details
+                    ,check_purchasings,add_products,update_purchase,price_offers_store)
 urlpatterns = [
     path('store/public/',public_store,name='public_store'),
     path('store/private/<int:branch_id>/',private_store,name='private_store'),  
@@ -13,4 +14,5 @@ urlpatterns = [
     path('edit/<int:pk>/',check_purchasings,name='check_purchasings'),
     path('products/add/<int:pk>/',add_products,name='add_products'),
     path('amount/products/<int:pk>/',update_purchase,name='update_purchase'),
+    path('offers/<int:pk>/',price_offers_store,name='price_offers_store')
 ]

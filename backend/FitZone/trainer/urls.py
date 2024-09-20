@@ -11,4 +11,6 @@ urlpatterns = [
     path('profile/',trainer_profile,name='trainer_profile'),
     path('subscription/',trainer_subscriptions,name = 'trainer_subscriptions'),
     path('subscription/<int:pk>/',trainer_subs_details,name='trainer_subs_details'),
+    path('client/groups/<int:trainer_id>/',client_groups,name='client_groups'),
+    path('client/current/',CurrentTrainerClient,name = 'CurrentTrainerClient'),
 ]

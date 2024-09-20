@@ -20,6 +20,7 @@ class BaseChatConsumer(WebsocketConsumer):
             raise StopConsumer()
         text_type = text_data.pop('type', None)
         
+        print(text_data)
         if text_type == 'new_message':
             try:
                 text_data['user'] = self.scope.get('user').pk
@@ -119,6 +120,9 @@ class OldChatConsumer(BaseChatConsumer):
         try:
             chatroom_id = self.scope.get('url_route').get('kwargs').get('chatroom_id')
             self.chatroom = Chatroom.objects.get(pk=chatroom_id)
+            print(self.chatroom.user_1.pk)
+            print(self.chatroom.user_2.pk)
+            print(self.scope.get('user').pk)
             self.receiver = None
             
             if self.chatroom.user_2 == self.scope.get('user'):
@@ -148,5 +152,6 @@ class OldChatConsumer(BaseChatConsumer):
         super().receive(text_data)
 
     def receiver_fun(self, data):
+        print('subclass receiver_fun')
         super().receiver_fun(data)
 OldChat = OldChatConsumer.as_asgi()

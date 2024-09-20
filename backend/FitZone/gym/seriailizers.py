@@ -5,7 +5,7 @@ from .models import *
 from django.db.models import Q, F
 from django.contrib.sites.shortcuts import get_current_site
 from django.urls import reverse    
-
+from drf_spectacular.utils import extend_schema_field
 
 def create_qr_code_for_branch(request, validated_data,gym):
         base_url = get_current_site(request)
@@ -234,9 +234,11 @@ class TrainerSerialzier(serializers.ModelSerializer):
                                                      queryset=Employee.objects.filter(user__is_deleted=False)
                                                      ,write_only=True)
     employee = EmployeeSerializer(read_only=True)
+    trainer_id = serializers.PrimaryKeyRelatedField(source='id',read_only=True)
+
     class Meta:
         model = Trainer 
-        fields= ['id','employee','employee_id','allow_public_posts','online_training_price','private_training_price','rate','number_of_rates']
+        fields= ['trainer_id','employee','employee_id','allow_public_posts','online_training_price','private_training_price','rate','number_of_rates']
 
 class AvailableGymsSerializer(serializers.ModelSerializer):
     branches = serializers.SerializerMethodField()
@@ -246,10 +248,12 @@ class AvailableGymsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Gym
         fields = ['name','description','image_path','branches','start_hour','close_hour','fees','woman_gym',]
-
+        
+    @extend_schema_field(serializers.CharField())
     def get_branches(self, obj):
         return BranchSerializer(Branch.objects.filter(
             gym=obj,
             is_active=True,
             number_of_clients_allowed__gt=F('current_number_of_clients')
         ),many=True).data
+

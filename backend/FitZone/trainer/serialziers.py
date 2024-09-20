@@ -34,6 +34,7 @@ class Client_TrainerSerializer(serializers.ModelSerializer):
             gender = 'male' if serializer['user']['gender'] == True else 'female'
             serializer['history'][0].pop('number_updates', None)
             data = {
+                'user_id':serializer['user']['id'],
                 'username':serializer['user']['username'],
                 'name':f"{serializer['user']['first_name']} {serializer['user']['last_name']}",
                 'age':serializer['user']['age'],
@@ -85,6 +86,7 @@ class TrainerGroupsSerializer(serializers.ModelSerializer):
         now = datetime.datetime.now()
         capacity = Client_Trainer.objects.filter(group = obj.pk,start_date__lte = now,end_date__gte=now,registration_status='accepted',is_deleted=False).count()
         return capacity
+    
         
     def get_days(self, days):
         return{day:name for day, name in days_of_week.items() if name in days.values()}
@@ -102,7 +104,7 @@ class TrainerProfileDataSerializer(TrainerSerialzier):
         model = Trainer
         fields = [ 
                   'groups','trainer_id','employee','employee_id','allow_public_posts',
-                  'online_training_price','private_training_price'
+                  'online_training_price','private_training_price','rate','number_of_rates'
         ]
     def get_groups(self,obj):
         groups = TrainerGroups.objects.filter(trainer=obj.pk) 
@@ -144,3 +146,20 @@ class SubscriptionWithTrainerSerializer(Client_TrainerSerializer):
             return UpdateSubscriptionWithTrainerService.update_sub(data,instance)
         except Exception as e:
             raise serializers.ValidationError(str(e))
+        
+        
+class ClientGroupsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TrainerGroups
+        fields = '__all__'
+        
+    def to_representation(self, instance):
+        try:
+            representation =  super().to_representation(instance)
+            count = Client_Trainer.objects.filter(group=representation['id'],registration_status='accepted',is_deleted=False).count()
+            if count >= representation['group_capacity']:
+                representation['group_status'] = 'full'
+            return representation
+        except Exception as e:
+            raise serializers.ValidationError(str(e))
+         

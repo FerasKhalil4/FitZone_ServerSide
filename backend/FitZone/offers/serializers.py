@@ -65,5 +65,5 @@ class Price_offersStoreSerializer(serializers.ModelSerializer):
     class Meta:
         model = Offer
         fields = [
-           'offer_id','start_date','end_date','branch','price_offer'
+           'offer_id','name','start_date','end_date','branch','price_offer'
         ]

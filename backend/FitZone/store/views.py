@@ -35,7 +35,7 @@ class StoreMixin():
 
         check_data = Branch_products.objects.filter(product_id = instance.pk,
                                                             branch =branch_id,
-                                                            product_type = 'Meal'
+                                                            product_type = product_type
                                                             )
         if check_data.exists():
             return Response({'message':'branch already has this Meal'}, status=status.HTTP_400_BAD_REQUEST)

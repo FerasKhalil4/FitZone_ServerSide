@@ -1,16 +1,14 @@
 from rest_framework import generics,status
-from rest_framework. decorators import api_view 
 from store.models import Product
 from store.serializers import PublicStoreSerializer,PrivateStoreSerializer,ProductSerializer
 from store.models import Branch_products,Supplements,Accessories,Meals
 from rest_framework.response import Response
 from .DataExamples import private_purchasing,public_purchasing
 from .serializers import (Private_Store_Purchase_Serializer, Public_Store_Purchase_Serializer,PurchaseSerializer
-                            ,EditPurchaseSerializer,AddProductsToPurchase,EditPurchasesSerializer)
+                            ,EditPurchaseSerializer,AddProductsToPurchase,EditPurchasesSerializer,PriceOffersStoreSerializer)
+from store.serializers import Branch_productSerializer
 from .models import Purchase
-from django.core.cache import cache
 from offers.models import Offer
-from gym.models import Branch 
 from offers.serializers import Price_offersStoreSerializer
 from drf_spectacular.utils import extend_schema
 from datetime import datetime
@@ -29,11 +27,8 @@ def get_products(qs,name=None,brand=None):
                 if supplement is not None:
                     if supplement.product.pk not in data:
                         if (name and ( name.lower() in supplement.product.name.lower())) or (brand and (brand.lower() in supplement.product.brand.lower())):
-
-                            print('--------------------')
                             data[supplement.product.pk] = ProductSerializer(supplement.product).data
                         elif name is None and brand is None:
-                            print('(*************************')
                             data[supplement.product.pk] = ProductSerializer(supplement.product).data
                 
             elif product.product_type == 'Accessory':
@@ -43,11 +38,9 @@ def get_products(qs,name=None,brand=None):
                         
                         if (name and ( name.lower() in accessory.product.name.lower())) or (brand and (brand.lower() in accessory.product.brand.lower())):
                             
-                            print('--------------------')
                             
                             data[accessory.product.pk] = ProductSerializer(accessory.product).data
                         elif name is None and brand is None:
-                            print('(*************************')
                             
                             data[accessory.product.pk] = ProductSerializer(accessory.product).data
                             
@@ -58,16 +51,62 @@ def get_products(qs,name=None,brand=None):
                     if meal.product.pk not in data:
                         if (name and ( name.lower() in meal.product.name.lower())) or (brand and (brand.lower() in meal.product.brand.lower())):
                             
-                            print('--------------------')
                             data[meal.product.pk] = ProductSerializer(meal.product).data
                         elif name is None and brand is None:
-                            print('(*************************')
                             
                             data[meal.product.pk] = ProductSerializer(meal.product).data
-                            
-                            
-                    
     return data
+
+
+def get_product_details(product_obj, name, brand):
+    if product_obj is None:
+        return None
+
+    if (name and name.lower() in product_obj.product.name.lower()) or \
+       (brand and brand.lower() in product_obj.product.brand.lower()):
+        return {
+            'base_product_id': product_obj.product.pk,
+            'name': product_obj.product.name,
+            'brand': product_obj.product.brand,
+            'description': product_obj.product.description
+        }
+    
+    if name is None and brand is None:
+        return {
+            'base_product_id': product_obj.product.pk,
+            'name': product_obj.product.name,
+            'brand': product_obj.product.brand,
+            'description': product_obj.product.description
+        }
+    
+    return None
+
+
+def get_private_products(qs, name=None, brand=None):
+    valid_products = []
+    for product in qs:
+        product['branch'] = product['branch']['id']
+        
+        if product['amount'] > 0 and product['is_available']:
+            product_details = None
+            
+            if product['product_type'] == 'Supplement':
+                supplement = Supplements.objects.filter(pk=product['product_branch_id']).first()
+                product_details = get_product_details(supplement, name, brand)
+            
+            elif product['product_type'] == 'Accessory':
+                accessory = Accessories.objects.filter(pk=product['product_branch_id']).first()
+                product_details = get_product_details(accessory, name, brand)
+            
+            elif product['product_type'] == 'Meal':
+                meal = Meals.objects.filter(pk=product['product_branch_id']).first()
+                product_details = get_product_details(meal, name, brand)
+            
+            if product_details:
+                product.update(product_details)
+                valid_products.append(product)
+    
+    return valid_products
 
  
 class PublicStoreListAV(generics.ListAPIView):
@@ -97,8 +136,12 @@ class PublicStoreListAV(generics.ListAPIView):
                 
                 for product in offer.price_offers.objects.values():
                     amount_product = Branch_products.objects.get(pk=product['product_id']).amount
-                    if amount_product > 0 :
-                        offer_data.append(Price_offersStoreSerializer(offer).data)
+                    if amount_product > 0 :                
+                        offer_details = Price_offersStoreSerializer(offer).data
+                        offer_details['price_offer'].pop('price_offer_objects')
+                        offer_details['price'] = offer_details['price_offer']['price']
+                        offer_details.pop('price_offer')
+                        offer_data.append(offer_details)
         products_data = self.get_queryset()
         data = {
             'products':products_data,
@@ -146,7 +189,8 @@ class PrivateStoreListAV(generics.ListAPIView):
         brand = self.request.GET.get('brand', None)
         branch_id = self.kwargs.get('branch_id')
         qs = Branch_products.objects.filter(branch=branch_id,branch__has_store=True)
-        data = get_products(qs,name=name,brand=brand)
+        serializer = Branch_productSerializer(qs,many=True).data
+        data = get_private_products(serializer,name=name,brand=brand)
         return data
     
     
@@ -155,8 +199,6 @@ class PrivateStoreListAV(generics.ListAPIView):
 )
     def get(self,request,*args, **kwargs):
         try:
-            branch= Branch.objects.get(pk=kwargs['branch_id'])
-            
             now = datetime.now().date()
             offers_qs = Offer.objects.filter(price_offers__isnull=False,branch=kwargs['branch_id'],start_date__lte=now,end_date__gte=now,
                                                             is_deleted=False,price_offers__objects__fee__isnull=True)
@@ -168,8 +210,12 @@ class PrivateStoreListAV(generics.ListAPIView):
                     for product in offer.price_offers.objects.values():
                         amount_product = Branch_products.objects.get(pk=product['product_id']).amount
                         if amount_product > 0 :
-                            offer_data.append(Price_offersStoreSerializer(offer).data)
-                        
+                            offer_details = Price_offersStoreSerializer(offer).data
+                            offer_details['price_offer'].pop('price_offer_objects')
+                            offer_details['price'] = offer_details['price_offer']['price']
+                            offer_details.pop('price_offer')
+                            offer_data.append(offer_details)
+                            
             products_data = self.get_queryset()
             data = {
                 'products':products_data,
@@ -307,3 +353,13 @@ class AddProductsToPurchaseAV(generics.CreateAPIView):
             return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
         
 add_products = AddProductsToPurchaseAV.as_view()
+
+
+
+@extend_schema(
+    summary='get the price offers details'
+)
+class PriceOfferRetreiveAV(generics.RetrieveAPIView):
+    serializer_class = PriceOffersStoreSerializer
+    queryset = Offer.objects.all()
+price_offers_store = PriceOfferRetreiveAV.as_view()

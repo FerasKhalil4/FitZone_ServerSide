@@ -192,7 +192,7 @@ class BranchDetailAV(generics.RetrieveUpdateDestroyAPIView):
 branchDetailAV =BranchDetailAV.as_view()
 
 class EmployeeListAV(generics.ListCreateAPIView):  
-    queryset = Employee.objects.all()
+    queryset = Shifts.objects.all()
     serializer_class = ShiftSerializer 
     filter_backends = [DjangoFilterBackend]
     filterset_class = EmployeeFilter
@@ -231,16 +231,16 @@ class EmployeeListAV(generics.ListCreateAPIView):
 employeeListAV = EmployeeListAV.as_view()
 
 class TrainerListAV(generics.ListCreateAPIView):
-    serializer_class = EmployeeSerializer
+    serializer_class = TrainerSerialzier
     filter_backends = [DjangoFilterBackend]
     filterset_class = TrainerFilter
     
-    def get_queryset(self, id):
-        return Employee.objects.filter(is_trainer = True , user__is_deleted= False , employee__branch_id=id)
+    def get_queryset(self):
+        return Trainer.objects.filter(employee__is_trainer = True , employee__user__is_deleted= False , employee__employee__branch_id=self.kwargs['branch_id'])
 
-    def get(self, request,branch_id, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         try:
-            qs = self.get_queryset(branch_id)
+            qs = self.get_queryset()
             qs = self.filter_queryset(qs)
             
             serializer = self.get_serializer(qs,many=True)

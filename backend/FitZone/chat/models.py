@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models import UniqueConstraint
+from django.core.exceptions import ValidationError
 
 class UserChannel(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE,related_name='channels')
@@ -16,6 +17,14 @@ class Chatroom(models.Model):
             UniqueConstraint(fields=['user_1', 'user_2'], name='unique_users')
         ]
         
+    def clean(self):
+        super().clean()
+        if self.user_1 == self.user_2:
+            raise ValidationError('Users cannot be the same')
+        
+    def save(self,*args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
     
 class Message(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='messages')

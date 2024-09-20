@@ -11,6 +11,7 @@ class Post(models.Model):
     approved_by = models.ForeignKey(Employee,on_delete=models.CASCADE, related_name="approved",null = True)
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    url = models.URLField(blank=True, max_length=200)
     
     def delete(self):
         self.is_deleted = True

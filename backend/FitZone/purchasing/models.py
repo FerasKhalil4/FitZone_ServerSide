@@ -13,7 +13,7 @@ class Purchase(models.Model):
     number_of_updates = models.IntegerField(default=0)
     
     def save(self,*args, **kwargs):
-        self.clean()
+        print('models')
         super().save(*args, **kwargs)
         
     def delete(self, *args, **kwargs):

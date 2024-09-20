@@ -33,6 +33,8 @@ class Gym_Session_Mixin():
     @staticmethod    
     def disease_check(events,equipment_id,user):
         exercises_ids = []
+        print(user['diseases'] )
+        print('----------------------------------------------------------------------------------')
         for exercise in events[equipment_id]['limitations']:
             check_diseases = any(disease in user['diseases'] for disease in events[equipment_id]['limitations'][exercise])
             if check_diseases :
@@ -44,7 +46,7 @@ class Gym_Session_Mixin():
     def use_equipment(branches, branch_id, text_data, username, data, check,user):
         equipment_id = text_data['equipment']
         events = branches[branch_id]['events']
-
+        print(user)
         if 'users' not in events[equipment_id]:
             
             events[equipment_id] = {
@@ -60,13 +62,15 @@ class Gym_Session_Mixin():
         print(events)
         print(events[equipment_id]['limitations'])
         exercise_ = Gym_Session_Mixin.disease_check(events,equipment_id,user)
-        
+        print(exercise_)
+        print('000000000000000000000000000000')
         data['limited_exercises']  = [{
                                     'equipmeny_exercise_id':exercise.pk,
                                     'exercise_name':exercise.exercise.name ,
                                        'equipment_name':exercise.equipment.name,
                                        'video_path':str(exercise.video_path),
                                        } for exercise in exercise_] if len(exercise_) != 0 else None
+        print(data['limited_exercises'])
         
         events[equipment_id]['users'].append(username)
         data['event'] = {
@@ -133,6 +137,7 @@ class GymConsumer(WebsocketConsumer):
         self.workout_id = self.scope.get('url_route').get('kwargs').get('workout_id') or None
         self.user = self.scope.get('user')
         self.flag = False
+        print(self.user.pk)
         try:
             with self.lock:
                 if self.branch_id not in self.branches:
@@ -250,6 +255,8 @@ class GymConsumer(WebsocketConsumer):
                                     async_to_sync(self.channel_layer.send)(self.channel_name,data)
                                 else:
                                     async_to_sync(self.channel_layer.send)(self.channel_name,data)
+                                    print(data['limited_exercises'])
+                                    print('-----------------------------')
                                     data.pop('limited_exercises')
                                     for channel in self.channel_layer.groups.get(self.group_name):
                                         if channel != self.channel_name:
@@ -264,6 +271,8 @@ class GymConsumer(WebsocketConsumer):
                             async_to_sync(self.channel_layer.send)(self.channel_name,data)
                         else:
                             async_to_sync(self.channel_layer.send)(self.channel_name,data)
+                            print(data['limited_exercises'])
+                            print('-----------------------------')
                             data.pop('limited_exercises')
                             for channel in self.channel_layer.groups.get(self.group_name):
                                 if channel != self.channel_name:

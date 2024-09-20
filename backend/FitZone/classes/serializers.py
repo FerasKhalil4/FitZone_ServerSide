@@ -173,9 +173,6 @@ class CreateClassSerializer(serializers.ModelSerializer):
             Class_Scheduel.objects.create(class_id=class_id, **schedule)
         return class_id
     
-    
-    
-    
 
 class ClientClassesSerializer(serializers.ModelSerializer):
     branch = BranchSerializer(read_only=True)

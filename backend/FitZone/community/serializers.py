@@ -2,6 +2,8 @@ from rest_framework import serializers
 from .models import *
 from fit_com.models import Comments_Replies
 from fit_com.serializers import CommentRepliesSerializer
+from django.urls import reverse 
+from django.contrib.sites.shortcuts import get_current_site
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Image
@@ -57,8 +59,16 @@ class PostSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Post
-        fields = ['approved_by','id','gym_id','images','videos','content','reaction_count','comments_count','reactions','comments','poster','is_approved','poster_id','created_at']
+        fields = ['approved_by','id','gym_id','images','videos','content','reaction_count','comments_count','reactions','comments','poster','is_approved','poster_id','created_at','url']
         ordering = ['created_at']
         
-
+        
+    def create(self,validated_data):
+        post = Post.objects.create(**validated_data)
+        request = self.context.get('request')
+        base_url = get_current_site(request)
+        url = f'http://{base_url}{reverse("post-detail", args=[post.pk, post.gym.pk])}'
+        post.url = url 
+        post.save()
+        return post
         

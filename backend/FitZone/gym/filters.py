@@ -1,6 +1,6 @@
 import django_filters
 from user.models import User
-from .models import Gym,Shifts,Employee
+from .models import Gym,Shifts,Trainer
 
 
 class UserFilter(django_filters.FilterSet):
@@ -31,11 +31,11 @@ class EmployeeFilter(django_filters.FilterSet):
         
         
 class TrainerFilter(django_filters.FilterSet):
-    username = django_filters.CharFilter(field_name='user__username',lookup_expr='icontains')
-    first_name = django_filters.CharFilter(field_name='user__first_name',lookup_expr='icontains')
-    last_name = django_filters.CharFilter(field_name='user__last_name',lookup_expr='icontains')
+    username = django_filters.CharFilter(field_name='employee__user__username',lookup_expr='icontains')
+    first_name = django_filters.CharFilter(field_name='employee__user__first_name',lookup_expr='icontains')
+    last_name = django_filters.CharFilter(field_name='employee__user__last_name',lookup_expr='icontains')
     
     class Meta:
-        model = Employee
+        model = Trainer
         fields = ['username','first_name','last_name']
         

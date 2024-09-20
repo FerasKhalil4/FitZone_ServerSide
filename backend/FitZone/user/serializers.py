@@ -161,8 +161,7 @@ class ClientSerializer(serializers.ModelSerializer):
 
         try:
             height = obj.height / 100
-            goal = Goal.objects.get(client_id=obj.pk,status='Active')
-            print(goal)
+            goal = Goal.objects.get(client_id=obj.pk,status='Active',is_deleted=False)
             if goal is not None :
                 weight = goal.weight
                 
@@ -176,8 +175,9 @@ class ClientSerializer(serializers.ModelSerializer):
         except Goal.DoesNotExist:
             raise serializers.ValidationError({'error':'please provide weight'})
     
+    
     def get_current_weight(self,obj):
-        weight = Goal.objects.get(client=obj.pk,status='Active').weight
+        weight = Goal.objects.get(client=obj.pk,status='Active',is_deleted=False).weight
         return weight
     def create(self, validated_data):
         user_data = validated_data.pop('user_profile', None)

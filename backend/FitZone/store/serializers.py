@@ -407,9 +407,11 @@ class PrivateStoreSerializer(serializers.ModelSerializer):
             
     
     
-    def get_retieved_data(self,instance,instance_data):
+    def get_retieved_data(self,product,instance,instance_data):
         instance.pop('product',None)
         return {
+        'product_name':product.name,
+        'product_brand':product.brand,
         'product_data':instance,
         'branch_product_id':instance_data.pk,
         'product_amount':instance_data.amount,
@@ -429,8 +431,8 @@ class PrivateStoreSerializer(serializers.ModelSerializer):
             for supplement in supplements:
                 try:
                     serializer = SupplementsSerializer(supplement).data
-                    instance = Branch_products.objects.get(product_id = supplement.pk,branch=branch,is_available=True)
-                    product_data.append(self.get_retieved_data(serializer,instance))
+                    instance = Branch_products.objects.get(product_id = supplement.pk,product_type='Supplement',branch=branch,is_available=True)
+                    product_data.append(self.get_retieved_data(product,serializer,instance))
                 except Branch_products.DoesNotExist:
                     pass
             
@@ -441,8 +443,8 @@ class PrivateStoreSerializer(serializers.ModelSerializer):
             for meal in meals:
                 try:
                     serializer = MealsSerializer(meal).data
-                    instance = Branch_products.objects.get(product_id = meal.pk,branch=branch,is_available=True)
-                    product_data.append(self.get_retieved_data(serializer,instance))
+                    instance = Branch_products.objects.get(product_id = meal.pk,product_type='Meal',branch=branch,is_available=True)
+                    product_data.append(self.get_retieved_data(product,serializer,instance))
                 except Branch_products.DoesNotExist:
                     pass
                 
@@ -452,8 +454,8 @@ class PrivateStoreSerializer(serializers.ModelSerializer):
             for accessory in accessories:
                 try:
                     serializer = AccessoriesSerializer(accessory).data
-                    instance = Branch_products.objects.get(product_id = accessory.pk,branch=branch,is_available=True)
-                    product_data.append(self.get_retieved_data(serializer,instance))
+                    instance = Branch_products.objects.get(product_id = accessory.pk,product_type='Accessory',branch=branch,is_available=True)
+                    product_data.append(self.get_retieved_data(product,serializer,instance))
                 except Branch_products.DoesNotExist:
                     pass
                 

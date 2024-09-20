@@ -10,6 +10,7 @@ from dateutil.relativedelta import relativedelta
 from django.db import transaction
 import json
 from drf_spectacular.utils import extend_schema
+
 def get_product_points(price):
     activity = Points.objects.get(activity="Purchasing").points_percentage
     return (int(price) // activity)
@@ -268,7 +269,10 @@ class ClientRegistrationListAV(generics.ListCreateAPIView):
     def post(self,request, *args, **kwargs):
         try:
             request.data['client'] = Client.objects.get(user=request.user.pk).pk
-            return super().post(request, *args, **kwargs)
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid(raise_exception=True):
+                serializer.save()
+            return Response({'message':'Client is Successfully Registered'},status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
 client_registration = ClientRegistrationListAV.as_view()

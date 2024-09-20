@@ -14,7 +14,8 @@ from django.db.models import Q
 from nutrition.serializers import NutritionPlan,NutritionPlanSerializer
 from wallet.models import Wallet, Wallet_Deposit
 from .services import SubscripeWithTrainerService,DeleteSubscriptionWihtTrainerService
-
+from gym_sessions.models import Gym_Subscription
+from gym_sessions.serializers import Client_BranchSerializer
 
 class ClientsListAV(generics.ListAPIView):
     serializer_class = Client_TrainerSerializer
@@ -157,6 +158,9 @@ class TrainerGroupsListAV(generics.ListCreateAPIView):
     serializer_class = TrainerGroupsSerializer
     queryset = TrainerGroups.objects.all()
     
+    def get_queryset(self):
+        return TrainerGroups.objects.filter(trainer__employee__user__pk =self.request.user.pk )
+    
     @extend_schema(
         summary='get trainer groups',
     )
@@ -241,7 +245,9 @@ class ClientDetailsAV(generics.RetrieveAPIView):
                 return Response({'error':'trainer not found'}, status=status.HTTP_404_NOT_FOUND)
             now =  datetime.datetime.now().date()
             try:
-                instance = Client_Trainer.objects.get(client=kwargs['client_id'],trainer=trainer,start_date__lte = now, end_date__gte = now,is_deleted=False)
+                instance = Client_Trainer.objects.get(client=kwargs['client_id'],trainer=trainer,start_date__lte = now
+                                                      , end_date__gte = now,registration_status = 'accepted'
+                                                      ,is_deleted=False)
             except Client_Trainer.DoesNotExist:
                 return Response({'error':'client not found for this trainer or training period'}, status=status.HTTP_404_NOT_FOUND)
             
@@ -250,20 +256,6 @@ class ClientDetailsAV(generics.RetrieveAPIView):
             return Response({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
 client_details = ClientDetailsAV.as_view()
 
-
-# @extend_schema(
-#     summary='get trainers for specific branch'
-# )
-# class TrainersListAV(generics.ListAPIView):
-#     serializer_class = TrainerProfileDataSerializer
-#     queryset = Trainer.objects.all()
-    
-#     def get_queryset(self):
-#         branch = self.kwargs['branch_id']
-#         trainers = Trainer.objects.filter(employee__employee__branch = branch)
-#         return trainers
-    
-# trainer_list = TrainersListAV.as_view()
 class TrainerProfileAV(generics.RetrieveAPIView):
     serializer_class = TrainerProfileDataSerializer
     queryset = Trainer.objects.all()
@@ -284,6 +276,19 @@ class TrainerProfileAV(generics.RetrieveAPIView):
         except Exception as e:
             return Response({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
 trainer_profile = TrainerProfileAV.as_view()
+
+class Client_TrainerGroupsListAv(generics.ListAPIView):
+    serializer_class = ClientGroupsSerializer
+    def get_queryset(self):
+        return TrainerGroups.objects.filter(trainer=self.kwargs['trainer_id'],is_deleted=False)
+    def get(self,request, *args, **kwargs):
+        trainer = Trainer.objects.get(pk=self.kwargs['trainer_id'])
+        return Response({'trainer_prices':{
+            'private': trainer.private_training_price,
+            'online': trainer.online_training_price,
+            },'group_data':self.get_serializer(self.get_queryset(),many=True).data},status=status.HTTP_200_OK)
+        
+client_groups = Client_TrainerGroupsListAv.as_view()
 
 class CLientTrainerRegistrationListAV(generics.ListCreateAPIView):
     serializer_class = SubscriptionWithTrainerSerializer
@@ -341,3 +346,25 @@ class ClientTrainerRegistrationDetailsAV(generics.RetrieveUpdateDestroyAPIView):
         
 
 trainer_subs_details = ClientTrainerRegistrationDetailsAV.as_view()
+
+class CurrentTrainerClientListAV(generics.RetrieveAPIView):
+    serializer_class = Client_TrainerSerializer
+    queryset = Client_Trainer.objects.all()
+    
+    def get(self, request, *args, **kwargs):
+        user = request.user.pk
+        now = datetime.datetime.now().date()
+        client = Client.objects.get(user__pk=user)
+        try:
+            trainer = Client_Trainer.objects.get(client=client,start_date__lte = now, end_date__gte = now, registration_status='accepted',is_deleted = False)
+            trainer = self.get_serializer(trainer).data
+        except Client_Trainer.DoesNotExist:
+            trainer = None 
+        try:
+            gym = Gym_Subscription.objects.get(client=client,start_date__lte = now, end_date__gte = now,is_active=True)
+            gym = Client_BranchSerializer(gym).data
+        except Gym_Subscription.DoesNotExist:
+            gym = None
+        return Response({'gym': gym, 'trainer':trainer}, status = status.HTTP_200_OK)
+
+CurrentTrainerClient = CurrentTrainerClientListAV.as_view()     

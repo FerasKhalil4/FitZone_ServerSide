@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import *
-from .services import(private_store_service,public_store_services,update_service,delete_purchase_service)
+from .services import(private_store_service,public_store_services,update_service,OffersService)
 from store.serializers import Branch_productSerializer
 from offers.serializers import OfferSerializer
 from user.models import Client
@@ -51,9 +51,12 @@ class Private_Store_Purchase_Serializer(serializers.ModelSerializer):
         fields = ['purchase_id','total','offered_total','created_at','products','vouchers','price_offers','branch','product_purchased','price_offers_purchased']
     
     def create(self, validated_data):
-        validated_data['client'] = Client.objects.get(user=self.context.get('request').user.pk)
+        user = self.context.get('request').user.pk
+        validated_data['client'] = Client.objects.get(user=user)
         purchase = private_store_service.PrivateStoreService.Purchase(validated_data)
         return purchase 
+    
+    
 class PublicStoreProducts(Branch_Products_PurchaseSerilaizer):
     branch_id = serializers.PrimaryKeyRelatedField(queryset = Branch.objects.filter(is_active = True),required=False)
 
@@ -86,9 +89,15 @@ class Public_Store_Purchase_Serializer(serializers.ModelSerializer):
         return super().validate(data)
         
     def create(self, validated_data):
-        validated_data['client'] = Client.objects.get(user=self.context.get('request').user.pk)
+        try:
+            user = self.context.get('request').user.pk
+            validated_data['client'] = Client.objects.get(user=user)
+        except Client.DoesNotExist:
+            print('client does not exist')
+        print(validated_data)
         purchase = public_store_services.PublicPurchaseService.Purchase(validated_data)
         return purchase
+
 
 class CLientPurchasingsSerializer(serializers.ModelSerializer):
     purhcsings = serializers.SerializerMethodField()
@@ -222,3 +231,31 @@ class PurchaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Purchase
         fields = ['purchase_id','total','offered_total','created_at','is_public','number_of_updates']
+        
+        
+class PriceOffersStoreSerializer(serializers.ModelSerializer):
+    price_offers_products = serializers.SerializerMethodField()
+    price_offer_details = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Offer
+        fields=['price_offer_details','price_offers_products']
+    
+    def get_price_offers_products(self,obj):
+        try:
+            
+            data = OffersService.OfferService.retrieve_offer_products(obj)
+            return data
+        
+        except Exception as e:
+            raise serializers.ValidationError(str(e))
+        
+    def get_price_offer_details(self, obj):
+        offer_data = OfferSerializer(obj).data
+        offer_data['branch'] = offer_data['branch']['id']
+        offer_data['price'] = offer_data['price_offer']['price']
+        offer_data.pop('price_offer')
+        offer_data.pop('percentage_offer')
+        # offer_data.pop('price_offer_objects')
+        return offer_data
+        

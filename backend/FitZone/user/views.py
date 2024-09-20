@@ -239,6 +239,9 @@ clientListAv = ClientListAV.as_view()
 class ClientProfile(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ClientSerializer
     queryset = Client.objects.filter(user__is_deleted = False)
+    def get_object(self, *args, **kwargs):
+        user = self.request.user.pk
+        return Client.objects.get(user = user)
     # permission_classes = [ClientCheck]
     
     

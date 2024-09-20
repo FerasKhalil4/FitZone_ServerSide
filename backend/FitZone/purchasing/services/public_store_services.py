@@ -102,31 +102,30 @@ class PublicPurchaseService():
     
     @staticmethod
     def Purchase(data):
-        products = data.pop('products')
-        vouchers_code = data.pop('vouchers',[])
-        voucher_discount = 0
-        client = data['client']
-        now = datetime.now().date()
-        price_offer = data.pop('price_offers',[])
-        price_offer_total = 0
-        
-        purchasing_instance = Purchase.objects.create(
-            client=client,
-            is_public=True
-        )
-        
-        if price_offer != []:
-            price_offer_total = PublicPurchaseService.use_price_offer(price_offer,purchasing_instance,now)
-            
-        if vouchers_code != []:
-            voucher_discount = PrivateStoreService.check_voucher(client,vouchers_code,now)
-        
-        total = PublicPurchaseService.purchase_management(products,voucher_discount,price_offer_total,purchasing_instance)
-        client.points += total['points']
-        client.save()
-        
-        purchasing_instance.total = total['total']
-        purchasing_instance.offered_total = total['offered_total'] if total['offered_total'] != total['total'] else None
-        purchasing_instance.save()
-        PrivateStoreService.wallet_cut(total,client)
-        return purchasing_instance
+        try:
+            products = data.pop('products')
+            vouchers_code = data.pop('vouchers',[])
+            voucher_discount = 0
+            client = data['client']
+            now = datetime.now().date()
+            price_offer = data.pop('price_offers',[])
+            price_offer_total = 0
+            purchasing_instance = Purchase.objects.create(
+                client=client,
+                is_public=True
+            )
+            if price_offer != []:
+                price_offer_total = PublicPurchaseService.use_price_offer(price_offer,purchasing_instance,now)
+                
+            if vouchers_code != []:
+                voucher_discount = PrivateStoreService.check_voucher(client,vouchers_code,now)
+            total = PublicPurchaseService.purchase_management(products,voucher_discount,price_offer_total,purchasing_instance)
+            client.points += total['points']
+            client.save()
+            purchasing_instance.total = total['total']
+            purchasing_instance.offered_total = total['offered_total'] if total['offered_total'] != total['total'] else None
+            purchasing_instance.save()
+            PrivateStoreService.wallet_cut(total,client)
+            return purchasing_instance
+        except Exception as e:
+            raise ValueError(str(e))

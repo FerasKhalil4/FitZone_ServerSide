@@ -147,7 +147,8 @@ class RegistrationClassService():
                     client=client,
                     class_id = schdule,
                     total = base_total,
-                    offered_total = offered_total
+                    offered_total = offered_total,
+                    retrieved_reason = ""
                 )
                 
                 schdule.current_number_of_trainees += 1
