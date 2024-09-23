@@ -2,13 +2,36 @@ from .models import Saved_Posts, Comments_Replies
 from community.models import *
 from user.models import Client
 from django.db.models import Q
-from trainer.models import Client_Trainer
+from trainer.models import Client_Trainer,Trainer
 from datetime import datetime
 from community.models import Comments,Reactions
 from gym_sessions.models import Gym_Subscription
-
+from block.models import BlockList
 
 class PostService():
+    
+    @staticmethod
+    def check_block_posts(user) -> Q:
+        block_query = Q(Q(
+        blocker = user,
+        )|Q(
+            blocked = user,
+        )) & Q(
+            blocking_status = True
+        )
+        blocked_users_queryset = BlockList.objects.filter(block_query)
+        print(blocked_users_queryset)
+        blocked_users = [item.blocked.pk for item in blocked_users_queryset]
+        blocking_users = [item.blocker.pk for item in blocked_users_queryset]
+        
+        query = ~Q(Q(
+            poster__user__pk__in = blocked_users
+        ) | Q(
+            poster__user__pk__in = blocking_users
+        ))
+
+        return query
+    
     
     @staticmethod
     def get_client_posts(user) -> Post:
@@ -33,31 +56,34 @@ class PostService():
         for item in gyms:
             if item.branch.gym.pk not in gym_ids:
                 gym_ids.append(item.branch.gym.pk )
-        print(gym_ids)
                 
-        query = Q(
+        query = (Q(
             gym__pk__in = gym_ids  
         ) | Q (
             gym__allow_public_posts=True
-        )
-        print(Gym.objects.get(pk=2).allow_public_posts)
-        
+        ) & Q(
+            poster__is_trainer=False
+        ))
+
         try:
             trainer = Client_Trainer.objects.get(client=client,start_date__lte = now, end_date__gte= now, registration_status = 'accepted',is_deleted=False).trainer.employee
             query |= Q(
                 poster = trainer
-            ) | Q(
+            ) 
+        except Client_Trainer.DoesNotExist:
+            pass
+        
+        query |= Q(
                 poster__trainer__allow_public_posts = True
             )
             
-        except Client_Trainer.DoesNotExist:
-            pass
-            
         query &= Q(
-            is_approved = True
+            is_approved = True,
+            is_deleted = False
         )
+        query &= PostService.check_block_posts(user)
         posts = Post.objects.filter(query).order_by('created_at')
-
+        
         return posts        
         
 class PostIntercationsService():
@@ -70,7 +96,7 @@ class PostIntercationsService():
             post = post,
             client = client,
             comment = comment
-        ).comment
+        )
         
         
     @staticmethod
@@ -80,17 +106,17 @@ class PostIntercationsService():
             check.reaction = reaction
             check.save()
             
-            return reaction
+            return check
         
         except Reactions.DoesNotExist:
             post.reaction_count += 1
             post.save()
             
-            return Reactions.objects.create(
+            return Reactions.objects.create( 
                 post = post,
                 client = client,
                 reaction = reaction
-            ).reaction
+            )
     @staticmethod
     def handle_delete_comment(post,comment,client):
         try:

@@ -1,11 +1,14 @@
 from channels.generic.websocket import WebsocketConsumer
+from .models import Branch_Sessions
 from chat.models import UserChannel
 from user.models import Client
 from disease.models import Client_Disease
 from plans.models import Workout_Exercises
+from gym.models import Branch
 from equipments.models import Diagrams_Equipments,Equipment_Exercise
 from equipments.serializers import Diagrams_EquipmentsSerializer, Equipment_ExerciseSerializer
 from asgiref.sync import async_to_sync
+from datetime import datetime,timezone, timedelta
 import json
 import threading
 
@@ -138,6 +141,8 @@ class GymConsumer(WebsocketConsumer):
         self.user = self.scope.get('user')
         self.flag = False
         print(self.user.pk)
+        
+
         try:
             with self.lock:
                 if self.branch_id not in self.branches:
@@ -173,6 +178,11 @@ class GymConsumer(WebsocketConsumer):
         except Client.DoesNotExist:
             return self.close(code=400)
         
+        branch=Branch.objects.get(pk=self.branch_id)
+        self.session = Branch_Sessions.objects.create(
+                    client = self.client,
+                    branch = branch,
+                )
         
         client_diseases = Client_Disease.objects.filter(client=self.client).values_list('disease_id', flat=True)
         for disease in client_diseases:
@@ -209,6 +219,9 @@ class GymConsumer(WebsocketConsumer):
             if self.scope.get('user').username in event['users']:
                 event['users'].remove(self.scope.get('user').username)
             print( self.branches[self.branch_id]['events'])
+        
+        self.session.end_session = datetime.now(timezone(timedelta(hours=3)))
+        self.session.save()
 
         return super().disconnect(code)
     

@@ -12,14 +12,14 @@ class Purchase_Product_Serializer(serializers.ModelSerializer):
     product_details = Branch_productSerializer(source='product' ,read_only=True)
     class Meta:
         model = Purchase_Product
-        fields = ['purchase_product_id','product','purchase_id','amount','product_details','product_total','product_offer_total']
+        fields = ['purchase_product_id','product','purchase_id','amount','product_details','product_total','product_offer_total','unit_price','unit_offered_price']
         
 class Purchase_Price_Offer_Serializer(serializers.ModelSerializer):
     purchase_price_offer_id = serializers.PrimaryKeyRelatedField(source='id',read_only=True)
     offer_detail = OfferSerializer(source='price_offer.offer',read_only=True)
     class Meta:
         model = Purchase_PriceOffer
-        fields = ['purchase_price_offer_id','price_offer','purchase_id','amount','offer_detail','offer_total']
+        fields = ['purchase_price_offer_id','price_offer','purchase_id','amount','offer_detail','offer_total','unit_price']
         
 class Branch_Products_PurchaseSerilaizer(serializers.Serializer):
     

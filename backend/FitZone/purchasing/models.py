@@ -28,7 +28,8 @@ class Purchase_Product(models.Model):
     product_total = models.FloatField(default=0.0)
     product_offer_total = models.FloatField(default=0.0)
     is_deleted = models.BooleanField(default=False)
-    
+    unit_price = models.FloatField(default=0.0)
+    unit_offered_price = models.FloatField(default=0.0)
     class Meta:
         constraints = [
             UniqueConstraint(fields=('purchase','product') ,name='purchase_products_constraint',
@@ -44,6 +45,7 @@ class Purchase_PriceOffer(models.Model):
     amount = models.PositiveIntegerField(default=0)
     offer_total = models.FloatField(default=0.0)
     is_deleted = models.BooleanField(default=False)
+    unit_price = models.FloatField(default=0.0)
     
     class Meta:
         constraints = [

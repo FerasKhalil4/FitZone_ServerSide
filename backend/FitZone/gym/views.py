@@ -324,7 +324,7 @@ class ShiftsUpdateAV(generics.RetrieveAPIView):
             if shift_.employee.user.role == 4 :
                 groups = TrainerGroups.objects.filter(trainer = shift_.employee.trainer.pk)
                 for group in groups:
-                    group_is_deleted = False
+                    group.is_deleted = False
                     group.save()
                     
             serializer = ShiftSerializer(shift_, data=data, partial=True)

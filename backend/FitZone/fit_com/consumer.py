@@ -33,11 +33,13 @@ class CommunityConsumer(WebsocketConsumer):
         
         if type == 'reaction':
             reaction = PostIntercationsService.handle_reaction(post,text_data['reaction'],client)
-            data['reaction'] = reaction
+            data['reaction'] = reaction.reaction 
+            data['total_reactions'] = reaction.post.reaction_count
         
         elif type == 'comment':
             comment = PostIntercationsService.handle_comments(post,text_data['comment'],client)
-            data['comment'] = comment
+            data['comment'] = comment.comment
+            data['total_comments'] = comment.post.comments_count
             
         elif type == 'reply':
             reply = PostIntercationsService.handle_reply(post,text_data['comment'],text_data['reply'],client)

@@ -7,6 +7,7 @@ from points.models import Points
 from django.db import transaction
 from dateutil.relativedelta import relativedelta
 from gym_sessions.models import Gym_Subscription 
+from block.models import BlockList
 
 
 class SubscripeWithTrainerService():
@@ -133,8 +134,7 @@ class SubscripeWithTrainerService():
         )
         
         return query
-        
-        
+    
     @staticmethod
     def subscripe_with_trainer(data) -> Client_Trainer:
         print(data)
@@ -143,6 +143,8 @@ class SubscripeWithTrainerService():
         registration_type = data.pop('registration_type')
         group = data.pop('group',None)
         # branch = data.pop('branch',None)
+        
+        
         now =  datetime.now().date()
         branches = Gym_Subscription.objects.filter(client=client,start_date__lte = now, end_date__gte = now,is_active=True).values_list('branch', flat=True)
         payment_total = trainer.private_training_price if group is not None else trainer.online_training_price
@@ -151,6 +153,7 @@ class SubscripeWithTrainerService():
         check = Client_Trainer.objects.filter(query)
         if check.exists():
             raise ValidationError('this client is already registered or in pending state with some trainer')
+        
         
         if group is not None:
             

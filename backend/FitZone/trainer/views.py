@@ -4,7 +4,7 @@ from django.db import transaction
 from drf_spectacular.utils import extend_schema
 from django_filters.rest_framework import DjangoFilterBackend
 from .serialziers import *
-from .filters import Client_TrainerFilter
+from .filters import Client_TrainerFilter, TrainerFilter
 from .DataExamples import *
 from gym.seriailizers import TrainerSerialzier,ShiftSerializer
 import datetime
@@ -16,7 +16,8 @@ from wallet.models import Wallet, Wallet_Deposit
 from .services import SubscripeWithTrainerService,DeleteSubscriptionWihtTrainerService
 from gym_sessions.models import Gym_Subscription
 from gym_sessions.serializers import Client_BranchSerializer
-
+from block.models import BlockList
+from fit_com.services import PostService
 class ClientsListAV(generics.ListAPIView):
     serializer_class = Client_TrainerSerializer
     queryset = Client_Trainer.objects.filter(registration_status = 'pending',is_deleted = False)
@@ -368,3 +369,33 @@ class CurrentTrainerClientListAV(generics.RetrieveAPIView):
         return Response({'gym': gym, 'trainer':trainer}, status = status.HTTP_200_OK)
 
 CurrentTrainerClient = CurrentTrainerClientListAV.as_view()     
+
+class TrainerCLientListAV(generics.ListAPIView):
+    serializer_class = TrainerSerialzier
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = TrainerFilter
+    
+    def get_queryset(self):
+        branch = self.kwargs['branch_id']
+        block_query = Q(Q(
+            blocker = self.request.user,
+        )|Q(
+            blocked = self.request.user,
+        )) & Q(
+            blocking_status = True
+        )
+        blocked_users_queryset = BlockList.objects.filter(block_query)
+        blocked_users = [item.blocked.pk for item in blocked_users_queryset]
+        blocking_users = [item.blocker.pk for item in blocked_users_queryset]
+        query = ~Q(Q(
+            employee__user__in = blocked_users
+        ) | Q(
+            employee__user__in = blocking_users
+            
+        )) & Q (
+            employee__employee__branch = branch,
+            employee__employee__is_active = True
+        )
+
+        return Trainer.objects.filter(query)
+trainer_list = TrainerCLientListAV.as_view()

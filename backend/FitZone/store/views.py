@@ -102,6 +102,7 @@ class ProductDetailsAV(generics.RetrieveUpdateDestroyAPIView):
         try:
             with transaction.atomic():
                 object_ = self.get_object()
+                print('--------------------------------')
                 serializer = self.get_serializer(object_, data=request.data, partial=True)
                 serializer.is_valid(raise_exception=True)
                 serializer.save()

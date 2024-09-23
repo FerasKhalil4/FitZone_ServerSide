@@ -48,10 +48,10 @@ class ChatRoomsListAV(generics.ListAPIView):
         summary='get chatrooms'
     )
     def get(self, request, *args, **kwargs):
-
-        
+        print(request.user.pk)
         chatrooms = Chatroom.objects.filter(Q(user_1=request.user.pk) | Q(user_2=request.user.pk))
-        data = ChatroomSerializer(chatrooms,many=True).data
+        data = ChatroomSerializer(chatrooms,many=True,context={'request':request}).data
+        print(data)
         for room in data:
             if room['user_1'] == request.user.pk:
                 room.pop('user_1', None) 

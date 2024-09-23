@@ -74,6 +74,7 @@ class PostDetailAV(generics.RetrieveUpdateDestroyAPIView):
             if request.user.role == 3 and 'is_approved' in data :
                 instance.is_approved = True
                 instance.approved_by = employee
+                instance.save()
                 return Response({'message':'post has been approved'},status= status.HTTP_200_OK)
             else:
                 data.pop('is_approved',None)

@@ -154,10 +154,6 @@ def check_Session(request,*args, **kwargs):
                 except Client.DoesNotExist:
                     return Response({'error':'client does not exist'}, status=status.HTTP_400_BAD_REQUEST)
                 print(client)
-                Branch_Sessions.objects.create(
-                    client = client,
-                    branch = branch,
-                )
                 diagram = SessionMixin.get_diagram(request.user, kwargs['branch_id'])
                 
                 if branch.gym.allow_branches_access == False :

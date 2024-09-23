@@ -20,6 +20,7 @@ class PublicPurchaseService():
         points_gained = 0 
         percentage_offer_data = {}
         now = datetime.now().date()
+        
         for product in products:
             flag = False
             branch_id = product['branch_id'].pk
@@ -27,6 +28,7 @@ class PublicPurchaseService():
                 percentage_offer = percentage_offer_data[branch_id] = PrivateStoreService.check_percentage_offers(branch_id,now)
             else:
                 percentage_offer = percentage_offer_data[branch_id]
+                
             products_total = 0
             product_offered_total = 0
             branch_product = product['branch_product_id']
@@ -90,7 +92,9 @@ class PublicPurchaseService():
                     product = product['branch_product_id'],
                     amount = product['amount'],
                     product_total = products_total,
-                    product_offer_total = product_offered_total                
+                    product_offer_total = product_offered_total  ,
+                    unit_price = branch_product.price,
+                    unit_offered_price = product_offered_total / amount              
                 )
         if vouchers != 0:
             offered_total = PrivateStoreService.use_voucher(vouchers,offered_total)

@@ -208,6 +208,7 @@ class Branch_Sessions(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='sessions') 
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='clients_sessions')
     created_at = models.DateTimeField(auto_now_add=True)
+    end_session = models.DateTimeField(default=datetime.datetime.now(), null=True)
     
     def get_points(self):
         print('get session points')

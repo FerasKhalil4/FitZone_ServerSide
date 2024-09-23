@@ -67,10 +67,12 @@ class Branch_productSerializer(serializers.ModelSerializer):
     def validate(self,data):
         amount = data.get('amount',None)        
         price = data.get('price',None)
-        if amount  < 0 :
-            raise serializers.ValidationError({'error':'please check on the amount field they should be positive values'})
-        if  price < 0 :
-            raise serializers.ValidationError({'error':'please check on the price field they should be positive values'})
+        if  amount is not None :
+            if amount < 0:
+                raise serializers.ValidationError({'error':'please check on the amount field they should be positive values'})
+        if  price is not None :
+            if price < 0:
+                raise serializers.ValidationError({'error':'please check on the price field they should be positive values'})
             
         return data
     

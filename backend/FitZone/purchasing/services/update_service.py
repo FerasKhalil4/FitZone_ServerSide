@@ -109,7 +109,7 @@ class UpdatePurchasing():
             product_total = product_purchased.product_offer_total if (product_purchased.product_offer_total < product_purchased.product_total) and(product_purchased.product_offer_total)  != 0 else product_purchased.product_total
             percentage_offers = PrivateStoreService.check_percentage_offers(product_purchased.product.branch.pk,now)
             product_type = product_purchased.product.product_type
-            single_product_price = product_total / product_purchased.amount
+            single_product_price = product_purchased.unit_offered_price if product_purchased.unit_offered_price <= product_purchased.unit_price else product_purchased.unit_price
             print(single_product_price)
             print('111111111')
             branch_product = Branch_products.objects.get(pk=product_purchased.product.pk)
@@ -586,43 +586,3 @@ class AddProductToPurchase():
             return purchasing_instance
         except Exception as e:
             raise ValueError(str(e))
-        
-        
-        
-    #         @staticmethod
-    # def check_editings(pk):
-    #     gym = {}
-    #     excluded_ids = []
-        
-    #     purchases = Purchase_Product.objects.filter(purchase=pk,is_deleted=False)
-    #     offers = Purchase_PriceOffer.objects.filter(purchase=pk,is_deleted=False)
-    #     purchase_instance = Purchase.objects.get(pk=pk)
-    #     for purchase in purchases:
-    #         product_gym = purchase.product.branch.gym
-
-    #         if (purchase_instance.number_of_updates <= product_gym.allowed_number_for_update) :
-    #             excluded_id = Check_Update.check_products(product_gym,gym,purchase)
-    #             if excluded_id is not None:
-    #                 excluded_ids.append(excluded_id) 
-    #         else:
-    #             excluded_ids.append(purchase.pk) 
-                
-    #     new_purchases =  purchases.exclude(id__in=excluded_ids)
-            
-    #     excluded_ids = []
-    #     for offer in offers:
-    #         product_gym = offer.price_offer.offer.branch.gym
-    #         if (purchase_instance.number_of_updates <= product_gym.allowed_number_for_update) :
-            
-    #             excluded_id = Check_Update.check_products(product_gym,gym,offer)
-    #             if excluded_id is not None:
-    #                 excluded_ids.append(excluded_id) 
-    #         else:
-    #             excluded_ids.append(offer.pk) 
-                
-    #     new_offers = offers.exclude(pk__in=excluded_ids)
-
-    #     return {
-    #         'purchases': new_purchases,
-    #         'offers':new_offers
-    #     } if len(new_purchases) + len(new_offers) > 0 else None

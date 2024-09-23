@@ -87,7 +87,8 @@ class PrivateStoreService():
                             purchase = purchasing_instance,
                             price_offer = offer_instance.price_offers,
                             amount =  amount,
-                            offer_total = offer_total
+                            offer_total = offer_total,
+                            unit_price = offer_instance.price_offers.price
                         )
 
             except Offer.DoesNotExist or Branch_products.DoesNotExist:
@@ -198,7 +199,9 @@ class PrivateStoreService():
                     product = product['branch_product_id'],
                     amount = product['amount'],
                     product_total = products_total,
-                    product_offer_total = product_offered_total
+                    product_offer_total = product_offered_total,
+                    unit_price = branch_product.price,
+                    unit_offered_price = product_offered_total / amount
                     
                 )
         if vouchers != 0:
