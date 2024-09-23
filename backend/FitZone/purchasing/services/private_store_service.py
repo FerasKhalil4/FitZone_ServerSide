@@ -83,7 +83,7 @@ class PrivateStoreService():
                         
                 if not flag :
                     print('doesnot exist')
-                    Purchase_PriceOffer.objects.create(
+                    Purchase_PriceOffer.objects.create( 
                             purchase = purchasing_instance,
                             price_offer = offer_instance.price_offers,
                             amount =  amount,
