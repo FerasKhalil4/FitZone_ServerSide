@@ -4,14 +4,14 @@ from django.db.models import Q
 class BlockService():
     
     @staticmethod
-    def get_query(data):
+    def get_query(data)-> Q:
         return Q(
-                blocker_id=data['blocker_id'],
-                blocked_id=data['blocked_id'],
+                blocker=data['blocker'],
+                blocked=data['blocked'],
             )
         
     @staticmethod
-    def create_block(data):
+    def create_block(data)-> BlockList:
         
         try:
             
