@@ -7,7 +7,8 @@ from datetime import datetime, timedelta, timezone
 from purchasing.models import Purchase_Product, Purchase_PriceOffer
 from store.models import Supplements, Accessories, Meals
 from store.serializers import SupplementsSerializer, MealsSerializer, AccessoriesSerializer
-from classes.models import Classes, Class_Scheduel ,Client_Class
+from classes.models import Client_Class
+from rate.models import Rate
 
 def get_duration_in_foramts(month=None, year=None) -> tuple:
     now = datetime.now().date()
@@ -17,6 +18,25 @@ def get_duration_in_foramts(month=None, year=None) -> tuple:
 
 
 class AdminStatsService():
+    
+    
+    @staticmethod
+    def get_app_rate():
+        return Rate.objects.filter(is_app_rate = True)
+    
+    @staticmethod
+    def get_rate_sum():
+        ratings = AdminStatsService.get_app_rate()
+        ratings_sum = 0
+        for rating in ratings:
+            ratings_sum += rating.value
+        return ratings_sum
+    
+    @staticmethod
+    def get_rate_average():
+        ratings_count = AdminStatsService.get_app_rate().count()
+        rating_sum = AdminStatsService.get_rate_sum()
+        return rating_sum / ratings_count
     
     @staticmethod
     def get_user_stats(month=None,year=None) -> dict:
@@ -31,8 +51,11 @@ class AdminStatsService():
                 users[user.date_joined.month] = 1
             else:
                 users[user.date_joined.month] += 1
+                
+        app_rate = AdminStatsService.get_rate_average()
         
         return {
+            'app_rate':app_rate,
             'users_across_year':users,
             'current_month_users': current_month_users,
             'users_specific_month': users_spec_month,
@@ -91,6 +114,17 @@ class AdminStatsService():
 class ManagerStatsService():
     
     @staticmethod
+    def get_branch_data(branch):
+        return {
+            'gym' : branch.gym.name,
+            'branch_pk' : branch.pk,
+            'address' : f'{branch.city} - {branch.street} - {branch.address}',
+            'current_number_of_clients' : branch.current_number_of_clients,
+            'rate' : branch.rate,
+            'number_of_ratings' : branch.number_of_rates,
+            'activity_status':branch.is_active
+        }
+    @staticmethod
     def get_branches_stats(manager,year=None)->dict:
         
         _, _, year = get_duration_in_foramts(year)
@@ -104,14 +138,9 @@ class ManagerStatsService():
             if branch.gym.name not in branches_details:
                 branches_details[branch.gym.name] = []
                 
-            branches_details[branch.gym.name].append({
-                'branch_pk' : branch.pk,
-                'address' : f'{branch.city} - {branch.street} - {branch.address}',
-                'current_number_of_clients' : branch.current_number_of_clients,
-                'rate' : branch.rate,
-                'number_of_ratings' : branch.number_of_rates,
-                'activity_status':branch.is_active
-            })
+            branch_data = ManagerStatsService.get_branch_data(branch)
+            branch_data.pop('gym')
+            branches_details[branch.gym.name].append(branch_data)
             
             active_subscriptions = Gym_Subscription.objects.filter(start_date__year = year,is_active = True, branch=branch.pk)
         
@@ -190,6 +219,29 @@ class ManagerStatsService():
         product_data[f'{purchased_product.purchase.created_at.month}_month'][product_item.pk]['details'] = serialized_data
         product_data[f'{purchased_product.purchase.created_at.month}_month'][product_item.pk]['purchased_amount'] = purchased_product.amount
         return product_data
+    
+    @staticmethod
+    def check_product_type(product_item):
+                
+        if product_item.product_type == 'Supplement':
+            product = Supplements.objects.get(pk=product_item.product_id)
+            serialized_data = SupplementsSerializer(product).data
+            
+        elif product_item.product_type == 'Meal':
+            product = Meals.objects.get(pk=product_item.product_id)
+            serialized_data = MealsSerializer(product).data
+            
+
+        elif product_item.product_type == 'Accessory':
+            product = Accessories.objects.get(pk=product_item.product_id)
+            serialized_data = AccessoriesSerializer(product).data
+    
+        serialized_data['product'].pop('image_path')
+        serialized_data['price'] = product_item.price
+        serialized_data['amount'] = product_item.amount
+    
+        return serialized_data
+        
         
     @staticmethod
     def get_products_details(qs) -> dict:
@@ -198,22 +250,7 @@ class ManagerStatsService():
         for purchased_product in qs:
             product_item = purchased_product.product
             
-            if product_item.product_type == 'Supplement':
-                product = Supplements.objects.get(pk=product_item.product_id)
-                serialized_data = SupplementsSerializer(product).data
-                
-            elif product_item.product_type == 'Meal':
-                product = Meals.objects.get(pk=product_item.product_id)
-                serialized_data = MealsSerializer(product).data
-                
-
-            elif product_item.product_type == 'Accessory':
-                product = Accessories.objects.get(pk=product_item.product_id)
-                serialized_data = AccessoriesSerializer(product).data
-                
-            serialized_data['product'].pop('image_path')
-            serialized_data['price'] = product_item.price
-            serialized_data['amount'] = product_item.amount
+            serialized_data = ManagerStatsService.check_product_type(product_item)
             
             if f'{purchased_product.purchase.created_at.month}_month' not in product_data:
                 product_data[f'{purchased_product.purchase.created_at.month}_month']= {}
@@ -258,6 +295,7 @@ class ManagerStatsService():
                     offer_details[f'{purchased_offer.purchase.created_at.month}_month'][offer_item.pk]['purchased_amount'] += purchased_offer.amount
         
         return offer_details
+    
     @staticmethod
     def get_products_sattistics(gym_manager,year) -> dict:
         
@@ -269,17 +307,22 @@ class ManagerStatsService():
         for branch in manager_branches:
             
             products_details[branch.pk] = {}
-            products_details[branch.pk]['address'] = f'{branch.city} - {branch.street} - {branch.address}'
-            products_details[branch.pk]['gym'] = branch.gym.name
+            branch_data = ManagerStatsService.get_branch_data(branch)
+            
+            products_details[branch.pk]['address'] = branch_data['address']
+            products_details[branch.pk]['gym'] = branch_data['gym']
+            
             products_details[branch.pk]['products'] = {}
             
             products_purchased_qs = Purchase_Product.objects.filter(product__branch = branch,purchase__created_at__year = year,is_deleted = False, purchase__is_deleted = False)
             products_details[branch.pk]['products'] = ManagerStatsService.get_products_details(products_purchased_qs)
             
             price_offers_purchased_qs = Purchase_PriceOffer.objects.filter(price_offer__offer__branch = branch,purchase__created_at__year = year)
+            
             offer_details[branch.pk] = {}
-            offer_details[branch.pk]['address'] = f'{branch.city} - {branch.street} - {branch.address}'
-            offer_details[branch.pk]['gym'] = branch.gym.name
+            
+            offer_details[branch.pk]['address'] = branch_data['address']
+            offer_details[branch.pk]['gym'] = branch_data['gym']
             offer_details[branch.pk]['offers'] = {}
             offer_details[branch.pk]['offers'] = ManagerStatsService.get_offer_details(price_offers_purchased_qs)
             
@@ -319,8 +362,10 @@ class ManagerStatsService():
                 if branch.pk not in class_details:
                     
                     class_details[branch.pk] = {}
-                    class_details[branch.pk]['address'] = f'{branch.city} - {branch.street} - {branch.address}'
-                    class_details[branch.pk]['gym'] = branch.gym.name
+                    branch_data = ManagerStatsService.get_branch_data(branch)
+                    
+                    class_details[branch.pk]['address'] = branch_data['address']
+                    class_details[branch.pk]['gym'] = branch_data['gym']
                     class_details[branch.pk]['classes'] = {}
                     
                     class_details = ManagerStatsService.get_classes_dict_struct(class_details, branch, active_class)

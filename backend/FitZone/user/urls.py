@@ -25,5 +25,6 @@ urlpatterns = [
     path('client/goal/',GoalListAv,name = 'goalListAV'),
     path('client-profile/scan/<int:client_id>/',employeeClientCheck,name = 'employeeClientCheck'),
     path('client/goal/<int:pk>/',GoalDetailDetails , name = 'goalDetailAV'),
-    # path('profile/' , user_profile , name = 'user_profile'),
+    # path('address/',get_current_address,name = 'address')
+    # path('profile/' , user_profile , name = 'user_profile'), 
 ]

@@ -10,12 +10,18 @@ class Client_BranchSerializer(serializers.ModelSerializer):
     fee_data = Registration_FeeSerializer(source='registration_type',read_only=True)
     vouchers = serializers.ListField(write_only=True)
     activate_gym_plan = serializers.BooleanField(write_only=True)
+    gym_name = serializers.CharField(source='branch.gym.name',read_only=True)
+    branch_address = serializers.SerializerMethodField()
     class Meta:
         model = Gym_Subscription
         fields = ['subscribtion_id','client','branch','registration_type','start_date','end_date',
                   'is_active','activate_gym_plan',
-                  'fee_data','price_offer','vouchers']
+                  'fee_data','price_offer','vouchers','gym_name','branch_address']
         read_only_fields = ['subscribtion_id','is_active','end_date','start_date']
+         
+    
+    def get_branch_address(self,obj):
+        return f'{obj.branch.address} - {obj.branch.city} - {obj.branch.street} '
         
     def create(self, data):
         data = OfferSubscriptionService.offer_check(data)

@@ -362,8 +362,8 @@ class CurrentTrainerClientListAV(generics.RetrieveAPIView):
         except Client_Trainer.DoesNotExist:
             trainer = None 
         try:
-            gym = Gym_Subscription.objects.get(client=client,start_date__lte = now, end_date__gte = now,is_active=True)
-            gym = Client_BranchSerializer(gym).data
+            gym = Gym_Subscription.objects.filter(client=client,start_date__lte = now, end_date__gte = now,is_active=True)
+            gym = Client_BranchSerializer(gym,many=True).data
         except Gym_Subscription.DoesNotExist:
             gym = None
         return Response({'gym': gym, 'trainer':trainer}, status = status.HTTP_200_OK)

@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404
+from django.http import JsonResponse
 from drf_spectacular.utils import extend_schema_view , extend_schema
 from django.contrib.auth.models import User
 from rest_framework import status , serializers
@@ -20,7 +21,9 @@ from wallet.serializers import WalletSerializer
 import datetime
 from django.db.models import Q
 from django.db import transaction
-import json
+import json 
+import requests
+
 
 def Check_points_offer():
     check = Points.objects.get(activity = 'First Time Activity')
@@ -394,3 +397,19 @@ class CLientProfileEmployeeListAV(generics.ListAPIView):
         except Exception as e:
             return Response(str(e),status=status.HTTP_400_BAD_REQUEST)
 employeeClientCheck = CLientProfileEmployeeListAV.as_view()
+
+
+# class GetUserLocation(APIView):
+#     def get(self, request):
+#         ip = request.META.get('REMOTE_ADDR')
+#         # ip = '192.168.1.9'
+#         response = requests.get(f'https://ipinfo.io/{ip}/json')
+
+#         if response.status_code == 200:
+#             data = response.json()
+#             city = data.get('city', 'Unknown')
+#             # address = data.get('region', 'Unknown')
+#             return Response({'city': city})
+#         else:
+#             return Response({'error': 'Unable to get location'}, status=400)
+# get_current_address = GetUserLocation.as_view()

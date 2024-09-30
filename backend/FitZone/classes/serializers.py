@@ -31,6 +31,8 @@ class Class_ScheduelSerializer(serializers.ModelSerializer):
             7: 'saturday'
         }
         
+        
+        
         def get_used_data(days):
             return {str(day):day_name for day, day_name in days_of_week.items() if day_name in days.values()}
         

@@ -43,4 +43,4 @@ class Client_Class(models.Model):
     retieved_money = models.FloatField(default=0, null=True)
     retrieved_reason = models.CharField(null = True, max_length=40)
     is_deleted = models.BooleanField(default=False)
-    
+    normal_price = models.FloatField(default=0.0)

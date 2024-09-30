@@ -22,6 +22,7 @@ class Gym_Subscription(models.Model):
     is_active = models.BooleanField(default=True)
     update_at = models.DateTimeField(auto_now=True)
     price_offer = models.FloatField(null=True)
+    normal_price = models.FloatField(default=0.0)
     
     def get_product_points(self):
         Purchasing_points = Points.objects.get(activity="Purchasing").points_percentage

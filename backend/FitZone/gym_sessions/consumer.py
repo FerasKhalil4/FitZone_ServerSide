@@ -145,7 +145,9 @@ class GymConsumer(WebsocketConsumer):
 
         try:
             with self.lock:
+                print('locking')
                 if self.branch_id not in self.branches:
+                    print('branch does not exist')
                     self.branches[self.branch_id] = {
                         'excercises':{
                             'equipments':[],
@@ -155,12 +157,14 @@ class GymConsumer(WebsocketConsumer):
                     }
 
                 if self.user.pk not in self.users:
+                    print('user not exists')
                     self.users[self.user.pk] = {
                         'excercises':[],
                         'diseases':[]
                     }
                     
                 else:
+                    print('user error')
                     self.flag = True
                     return self.close(code=400)
         except Exception as e:
@@ -174,11 +178,14 @@ class GymConsumer(WebsocketConsumer):
             
             
         try:
+            print('get_client')
             self.client = Client.objects.get(user=self.user)
         except Client.DoesNotExist:
             return self.close(code=400)
         
+        print('branch')
         branch=Branch.objects.get(pk=self.branch_id)
+        print('create branch session')
         self.session = Branch_Sessions.objects.create(
                     client = self.client,
                     branch = branch,

@@ -49,7 +49,7 @@ def get_products(qs,name=None,brand=None):
                 meal = Meals.objects.filter(pk=product.product_id).first()
                 if meal is not None:
                     if meal.product.pk not in data:
-                        if (name and ( name.lower() in meal.product.name.lower())) or (brand and (brand.lower() in meal.product.brand.lower())):
+                        if (name and ( name.lower() in meal.product.name.lower())):
                             
                             data[meal.product.pk] = ProductSerializer(meal.product).data
                         elif name is None and brand is None:
@@ -62,8 +62,7 @@ def get_product_details(product_obj, name, brand):
     if product_obj is None:
         return None
 
-    if (name and name.lower() in product_obj.product.name.lower()) or \
-       (brand and brand.lower() in product_obj.product.brand.lower()):
+    if (name and name.lower() in product_obj.product.name.lower()):
         return {
             'base_product_id': product_obj.product.pk,
             'name': product_obj.product.name,

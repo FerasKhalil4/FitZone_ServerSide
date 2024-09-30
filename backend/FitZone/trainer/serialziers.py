@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import *
 from user.serializers import ClientSerializer
-from gym.seriailizers import GymSerializer,TrainerSerialzier
+from gym.seriailizers import GymSerializer,TrainerSerialzier,BranchSerializer,ShiftSerializer
 from .services import SubscripeWithTrainerService,UpdateSubscriptionWithTrainerService
 from gym.models import Branch
 
@@ -21,11 +21,12 @@ class Client_TrainerSerializer(serializers.ModelSerializer):
     client_details =serializers.SerializerMethodField()
     client = serializers.PrimaryKeyRelatedField(queryset=Client.objects.filter(user__is_deleted=False),write_only=True)
     old_group_number = serializers.IntegerField(write_only=True,allow_null=True)
+    trainer_username = serializers.CharField(source='trainer.employee.user.username',read_only=True) 
 
     class Meta:
-        model = Client_Trainer
+        model = Client_Trainer 
         fields =['Trainer_registration_id','client','client_details','trainer','start_date','end_date'
-                 ,'registration_type','registration_status','rejection_reason','group','old_group_number']
+                 ,'registration_type','registration_status','rejection_reason','group','old_group_number','trainer_username']
 
               
     def get_client_details(self,obj):
@@ -50,15 +51,22 @@ class Client_TrainerSerializer(serializers.ModelSerializer):
         except Exception as e:
             raise serializers.ValidationError(str(e))
 class TrainerGroupsSerializer(serializers.ModelSerializer):
-    gym_data = GymSerializer(source='gym',read_only=True)
+    Gym_data = GymSerializer(source='branch.gym',read_only=True)
+    Trainer_shift = serializers.SerializerMethodField()
+    branch_data = BranchSerializer(source='branch',read_only=True)
     group_id = serializers.PrimaryKeyRelatedField(source = 'id', read_only=True)
     current_group_capacity = serializers.SerializerMethodField()
     clients= serializers.SerializerMethodField()
     
     class Meta:
         model = TrainerGroups
-        fields = ['group_id','clients','trainer','gym','start_hour','end_hour','group_capacity','days_off','gym_data','current_group_capacity']
+        fields = ['group_id','clients','trainer','branch','start_hour','end_hour','group_capacity','days_off','branch_data','current_group_capacity','Gym_data','Trainer_shift']
     
+    
+    
+    def get_Trainer_shift(self, obj):
+        trainer_shifts = obj.trainer.employee.employee.filter(is_active=True)
+        return ShiftSerializer(trainer_shifts, many=True).data
     
     def get_clients(self,obj):
         try:
